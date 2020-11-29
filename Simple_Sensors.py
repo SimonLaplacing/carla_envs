@@ -58,7 +58,7 @@ class CollisionSensor(object):
         self = weak_self()
         if not self:
             return
-        print('collision')
+        # print('collision')
         impulse = event.normal_impulse
         intensity = math.sqrt(impulse.x ** 2 + impulse.y ** 2 + impulse.z ** 2)
         self.history.append((event.frame, intensity))
@@ -91,4 +91,4 @@ class LaneInvasionSensor(object):
         self = weak_self()
         if not self:
             return
-        print('lane invasion')
+        # print('lane invasion')

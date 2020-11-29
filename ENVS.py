@@ -58,7 +58,7 @@ def main():
 
         # npc设置
         for i in range(1):
-            transform.location += carla.Location(x=12)
+            transform.location += carla.Location(x=40)
             bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             npc = world.try_spawn_actor(bp, transform)
             if npc is None:
@@ -79,20 +79,37 @@ def main():
                 obstacle_list.append(obstacle)
                 print('created %s' % obstacle.type_id)
 
-        # 车辆控制
-        set_control = carla.VehicleControl(throttle = 0.5, steer = 0.5)
-        ego.apply_control(set_control)
-        # npc.apply_control(set_control)
-        # for vehicle in actor_list:
-        #     vehicle.set_autopilot(True)
-
         # 传感器设置
         collision = SS.CollisionSensor(ego)
         lane_invasion = SS.LaneInvasionSensor(ego)
-        sensor_list = [collision.sensor, lane_invasion.sensor]  
+        sensor_list = [collision.sensor, lane_invasion.sensor]
+
+        # 车辆控制
+        sim_time = 0
+        while sim_time < 20:
+            timestamp = world.wait_for_tick().timestamp
+            sim_time += timestamp.delta_seconds
+            if sim_time > 1:
+                set_control = carla.VehicleControl(throttle = 0.5, steer = 0.1)
+                ego.apply_control(set_control)
+                print('left')
+            elif sim_time > 2.9:
+                set_control = carla.VehicleControl(throttle = 0.5, steer = -0.2)
+                ego.apply_control(set_control)
+                print('right')
+            elif sim_time > 4.9:
+                set_control = carla.VehicleControl(throttle = 0.3, steer = 0)
+                ego.apply_control(set_control)
+            else:
+                set_control = carla.VehicleControl(throttle = 0.5, steer = 0)
+                ego.apply_control(set_control)
+                        
+            # npc.apply_control(set_control)
+            # for vehicle in actor_list:
+            #     vehicle.set_autopilot(True)  
 
         # 仿真时间设置
-        time.sleep(50)
+        time.sleep(5)
 
     finally:
         # 删除车辆
