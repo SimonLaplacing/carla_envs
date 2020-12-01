@@ -7,7 +7,6 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 from tianshou.policy import DQNPolicy
-from tianshou.env import DummyVectorEnv
 from tianshou.utils.net.common import Net
 from tianshou.trainer import offpolicy_trainer
 from tianshou.data import Collector, ReplayBuffer, PrioritizedReplayBuffer
@@ -44,16 +43,11 @@ def get_args():
 
 
 def test_dqn(args=get_args()):
-    env = gym.make(args.task)
-    args.state_shape = env.observation_space.shape or env.observation_space.n
-    args.action_shape = env.action_space.shape or env.action_space.n
-    # train_envs = gym.make(args.task)
-    # you can also use tianshou.env.SubprocVectorEnv
-    train_envs = DummyVectorEnv(
-        [lambda: gym.make(args.task) for _ in range(args.training_num)])
-    # test_envs = gym.make(args.task)
-    test_envs = DummyVectorEnv(
-        [lambda: gym.make(args.task) for _ in range(args.test_num)])
+    train_envs = gym.make(args.task)
+    test_envs = gym.make(args.task)
+    args.state_shape = train_envs.observation_space.shape
+    args.action_shape = train_envs.action_space.shape
+
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -119,13 +113,6 @@ def test_dqn(args=get_args()):
         collector = Collector(policy, env)
         result = collector.collect(n_episode=1, render=args.render)
         print(f'Final reward: {result["rew"]}, length: {result["len"]}')
-
-
-def test_pdqn(args=get_args()):
-    args.prioritized_replay = 1
-    args.gamma = .95
-    args.seed = 1
-    test_dqn(args)
 
 
 if __name__ == '__main__':

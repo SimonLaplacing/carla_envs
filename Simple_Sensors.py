@@ -47,10 +47,7 @@ class CollisionSensor(object):
 
     def get_collision_history(self):
         """Gets the history of collisions"""
-        history = collections.defaultdict(int)
-        for frame, intensity in self.history:
-            history[frame] += intensity
-        return history
+        return self.history
 
     @staticmethod
     def _on_collision(weak_self, event):
@@ -58,10 +55,7 @@ class CollisionSensor(object):
         self = weak_self()
         if not self:
             return
-        # print('collision')
-        impulse = event.normal_impulse
-        intensity = math.sqrt(impulse.x ** 2 + impulse.y ** 2 + impulse.z ** 2)
-        self.history.append((event.frame, intensity))
+        self.history.append(1)
         if len(self.history) > 4000:
             self.history.pop(0)
 
