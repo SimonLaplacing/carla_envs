@@ -4,6 +4,7 @@ import torch
 import pprint
 import argparse
 import numpy as np
+import ENVS
 from torch.utils.tensorboard import SummaryWriter
 
 from tianshou.policy import DQNPolicy
@@ -14,7 +15,6 @@ from tianshou.data import Collector, ReplayBuffer, PrioritizedReplayBuffer
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default='CartPole-v0')
     parser.add_argument('--seed', type=int, default=1626)
     parser.add_argument('--eps-test', type=float, default=0.05)
     parser.add_argument('--eps-train', type=float, default=0.1)
@@ -43,10 +43,8 @@ def get_args():
 
 
 def test_dqn(args=get_args()):
-    train_envs = gym.make(args.task)
-    test_envs = gym.make(args.task)
-    args.state_shape = train_envs.observation_space.shape
-    args.action_shape = train_envs.action_space.shape
+    args.state_shape = ENVS.observation_space.shape
+    args.action_shape = ENVS.action_space.shape
 
     # seed
     np.random.seed(args.seed)
@@ -114,6 +112,3 @@ def test_dqn(args=get_args()):
         result = collector.collect(n_episode=1, render=args.render)
         print(f'Final reward: {result["rew"]}, length: {result["len"]}')
 
-
-if __name__ == '__main__':
-    test_dqn(get_args())
