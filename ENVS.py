@@ -21,10 +21,7 @@ import copy
 
 class Create_Envs(object):
 
-    def __init__(self,reward):
-        self.reward = reward
-
-    def connection():
+    def connection(self):
         # 连接客户端:localhost:2000\192.168.199.238:2000
         client = carla.Client('localhost', 2000)
         client.set_timeout(20.0)
@@ -34,8 +31,13 @@ class Create_Envs(object):
 
         # 蓝图
         blueprint_library = world.get_blueprint_library()
+        return client, world, blueprint_library
 
-    def Create_actors(): 
+    def Create_actors(self,world, blueprint_library): 
+        ego_list = []
+        npc_list = []
+        obstacle_list = []
+        sensor_list = []
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
@@ -43,7 +45,7 @@ class Create_Envs(object):
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
-        actor_list.append(ego)
+        ego_list.append(ego)
         print('created %s' % ego.type_id)
 
         # 视角设置------------------------------------------------------------------
@@ -64,7 +66,7 @@ class Create_Envs(object):
             if npc is None:
                 print('%s npc created failed' % i)
             else:
-                actor_list.append(npc)
+                npc_list.append(npc)
                 print('created %s' % npc.type_id)
 
         # 障碍物设置------------------------------------------------------------------
@@ -86,9 +88,10 @@ class Create_Envs(object):
         # lane_invasion = SS.LaneInvasionSensor(ego)
         sensor_list.append(ego_collision.sensor)
         sensor_list.append(npc_collision.sensor)
+        return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def ego_step(action,simtime): # 1变道 2刹车
+    def get_ego_step(self,ego,action,sim_time): # 1变道 2刹车
         if action == 1:
             if 0 < sim_time <= 1.2:
                 ego_control = carla.VehicleControl(throttle = 0, steer = 0)
@@ -115,58 +118,28 @@ class Create_Envs(object):
                 ego.apply_control(ego_control)
             
 
-        def npc_step(action,simtime): # 1刹车 2加速
-            if action == 1:
-                if 0 < sim_time <= 6:
-                    npc_control = carla.VehicleControl(throttle = 1)
-                    npc.apply_control(npc_control)
-                elif 6 < sim_time <= 7:
-                    npc_control = carla.VehicleControl(throttle = 0, brake = 0.3)
-                    npc.apply_control(npc_control)                     
-                else:
-                    npc_control = carla.VehicleControl(throttle = 0.5, brake = 0)
-                    npc.apply_control(npc_control)
+    def get_npc_step(self,npc,action,sim_time): # 1刹车 2加速
+        if action == 1:
+            if 0 < sim_time <= 6:
+                npc_control = carla.VehicleControl(throttle = 1)
+                npc.apply_control(npc_control)
+            elif 6 < sim_time <= 7:
+                npc_control = carla.VehicleControl(throttle = 0, brake = 0.3)
+                npc.apply_control(npc_control)                     
+            else:
+                npc_control = carla.VehicleControl(throttle = 0.5, brake = 0)
+                npc.apply_control(npc_control)
 
-            if action == 2:
-                if 0 < sim_time <= 2:
-                    npc_control = carla.VehicleControl(throttle = 1)
-                    npc.apply_control(npc_control) 
-                else:
-                    npc_control = carla.VehicleControl(throttle = 1)
-                    npc.apply_control(npc_control)
+        if action == 2:
+            if 0 < sim_time <= 2:
+                npc_control = carla.VehicleControl(throttle = 1)
+                npc.apply_control(npc_control) 
+            else:
+                npc_control = carla.VehicleControl(throttle = 1)
+                npc.apply_control(npc_control)
 
-        sim_time = 0  # 仿真时间
-        start_time = time.time()  # 初始时间
 
-        # egocol_list = ego_collision.get_collision_history()
-        # npccol_list = npc_collision.get_collision_history()
-        move= [random.randint(1,2),random.randint(1,2)]
-        while sim_time < 20:  # 仿真时间限制
-            sim_time = time.time() - start_time
-            ego_step(move[0],sim_time)
-            npc_step(move[1],sim_time)       
-            
-            # npc.apply_control(set_control)
-            # for vehicle in actor_list:
-            #     vehicle.set_autopilot(True)
-
-        # 仿真时间设置
-        time.sleep(2)
-
-        for sensor in sensor_list:
-            if sensor is not None:
-                sensor.destroy()            
-        for x in actor_list:
-            if x is not None:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in obstacle_list:
-            if x is not None:
-                client.apply_batch([carla.command.DestroyActor(x) for x in obstacle_list])
-
-        cyc -= 1
-        print('Reset')
-
-    def get_reward(reward,move):  
+    def get_reward(self,reward,move):  
         if move == [1,2]:
             reward += -200
         elif move == [1,1]:
@@ -178,25 +151,66 @@ class Create_Envs(object):
         return reward
 
 def main():
-    actor_list = []
-    obstacle_list = []
-    sensor_list = []
+    reward = 0
+    cyc = 5
+    create_envs = Create_Envs()
+    client, world, blueprint_library = create_envs.connection()
 
+    try:
+        while cyc:
+            ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
-    # while cyc:
+            sim_time = 0  # 仿真时间
+            start_time = time.time()  # 初始时间
+            move= [random.randint(1,2),random.randint(1,2)]
+            # egocol_list = ego_collision.get_collision_history()
+            # npccol_list = npc_collision.get_collision_history()
+            
+            while sim_time < 15:  # 仿真时间限制
+                sim_time = time.time() - start_time
+                
+                create_envs.get_ego_step(ego_list[0],move[0],sim_time)       
+                create_envs.get_npc_step(npc_list[0],move[1],sim_time)
+                # npc.apply_control(set_control)
+                # for vehicle in actor_list:
+                #     vehicle.set_autopilot(True)
+            
+            reward = create_envs.get_reward(reward,move)
+            print(reward)
+            # 仿真时间设置
+            time.sleep(1)
 
-    # 清洗环境
-    print('destroying actors')
-    for sensor in sensor_list:
-        if sensor is not None:
-            sensor.destroy()
-    for x in actor_list:
-        if x is not None:
-            client.apply_batch([carla.command.DestroyActor(x)])
-    for x in obstacle_list:
-        if x is not None:
-            client.apply_batch([carla.command.DestroyActor(x)])
-    print('done!')
+            for x in sensor_list:
+                if x is not None:
+                    x.destroy()            
+            for x in ego_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in npc_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in obstacle_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+
+            cyc -= 1
+            print('Reset')
+    except:
+        # 清洗环境
+        print('destroying actors')
+        for x in sensor_list:
+            if x is not None:
+                x.destroy()
+        for x in ego_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in npc_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in obstacle_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        print('done!')
 
 if __name__ == '__main__':
 
