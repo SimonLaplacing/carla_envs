@@ -1,5 +1,4 @@
 import os
-import gym
 import torch
 import pprint
 import argparse
@@ -43,14 +42,14 @@ def get_args():
 
 
 def test_dqn(args=get_args()):
-    args.state_shape = ENVS.observation_space.shape
-    args.action_shape = ENVS.action_space.shape
+    envs = ENVS.Create_Envs()
+    args.state_shape = envs.get_state_space
+    args.action_shape = envs.get_action_space
 
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    train_envs.seed(args.seed)
-    test_envs.seed(args.seed)
+
     # model
     net = Net(args.layer_num, args.state_shape,
               args.action_shape, args.device,  # dueling=(1, 1)

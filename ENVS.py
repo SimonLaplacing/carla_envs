@@ -2,6 +2,7 @@ import glob
 import os
 import sys
 import Simple_Sensors as SS
+import numpy as np
 
 try:
     sys.path.append(glob.glob('E:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
@@ -138,6 +139,13 @@ class Create_Envs(object):
                 npc_control = carla.VehicleControl(throttle = 1)
                 npc.apply_control(npc_control)
 
+    def get_action_space(self):
+        action_space = np.array([1,2])
+        return action_space
+    
+    def get_state_space(self):
+        state_space = np.array([0,1])
+        return state_space
 
     def get_reward(self,reward,move):  
         if move == [1,2]:
@@ -155,6 +163,8 @@ def main():
     cyc = 5
     create_envs = Create_Envs()
     client, world, blueprint_library = create_envs.connection()
+    action_space = create_envs.get_action_space()
+    state_space = create_envs.get_state_space()
 
     try:
         while cyc:
@@ -162,15 +172,15 @@ def main():
 
             sim_time = 0  # 仿真时间
             start_time = time.time()  # 初始时间
-            move= [random.randint(1,2),random.randint(1,2)]
+            action= [random.choice(action_space),random.choice(action_space)]
             # egocol_list = ego_collision.get_collision_history()
             # npccol_list = npc_collision.get_collision_history()
             
             while sim_time < 15:  # 仿真时间限制
                 sim_time = time.time() - start_time
                 
-                create_envs.get_ego_step(ego_list[0],move[0],sim_time)       
-                create_envs.get_npc_step(npc_list[0],move[1],sim_time)
+                create_envs.get_ego_step(ego_list[0],action[0],sim_time)       
+                create_envs.get_npc_step(npc_list[0],action[1],sim_time)
                 # npc.apply_control(set_control)
                 # for vehicle in actor_list:
                 #     vehicle.set_autopilot(True)
