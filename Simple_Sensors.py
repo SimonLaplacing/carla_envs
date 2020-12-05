@@ -35,7 +35,7 @@ class CollisionSensor(object):
     def __init__(self, parent_actor):
         """Constructor method"""
         self.sensor = None
-        self.history = []
+        self.history = [0]
         self._parent = parent_actor
         world = self._parent.get_world()
         blueprint = world.get_blueprint_library().find('sensor.other.collision')
@@ -55,7 +55,7 @@ class CollisionSensor(object):
         self = weak_self()
         if not self:
             return
-        self.history.append(1)
+        self.history[0] = 1
         if len(self.history) > 4000:
             self.history.pop(0)
 

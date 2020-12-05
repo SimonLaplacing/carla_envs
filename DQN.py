@@ -11,17 +11,17 @@ from tianshou.utils.net.common import Net
 from tianshou.trainer import offpolicy_trainer
 from tianshou.data import Collector, ReplayBuffer, PrioritizedReplayBuffer
 
-
+# 参数设置-----------------------------------------------------------
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=1626)
+    parser.add_argument('--seed', type=int, default=16)
     parser.add_argument('--eps-test', type=float, default=0.05)
     parser.add_argument('--eps-train', type=float, default=0.1)
-    parser.add_argument('--buffer-size', type=int, default=20000)
+    parser.add_argument('--buffer-size', type=int, default=2000)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--gamma', type=float, default=0.9)
-    parser.add_argument('--n-step', type=int, default=3)
-    parser.add_argument('--target-update-freq', type=int, default=320)
+    parser.add_argument('--n-step', type=int, default=1)
+    parser.add_argument('--target-update-freq', type=int, default=20)
     parser.add_argument('--epoch', type=int, default=10)
     parser.add_argument('--step-per-epoch', type=int, default=1000)
     parser.add_argument('--collect-per-step', type=int, default=10)
@@ -40,11 +40,11 @@ def get_args():
     args = parser.parse_known_args()[0]
     return args
 
-
+# 主算法------------------------------------------------------------
 def test_dqn(args=get_args()):
     envs = ENVS.Create_Envs()
-    args.state_shape = envs.get_state_space
-    args.action_shape = envs.get_action_space
+    args.state_shape = envs.get_state_space().shape
+    args.action_shape = envs.get_action_space().shape
 
     # seed
     np.random.seed(args.seed)
@@ -52,21 +52,23 @@ def test_dqn(args=get_args()):
 
     # model
     net = Net(args.layer_num, args.state_shape,
-              args.action_shape, args.device,  # dueling=(1, 1)
+              args.action_shape, args.device,  
               ).to(args.device)
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
     policy = DQNPolicy(
         net, optim, args.gamma, args.n_step,
         target_update_freq=args.target_update_freq)
+
     # buffer
     if args.prioritized_replay > 0:
         buf = PrioritizedReplayBuffer(
             args.buffer_size, alpha=args.alpha, beta=args.beta)
     else:
         buf = ReplayBuffer(args.buffer_size)
+    
     # collector
     train_collector = Collector(policy, train_envs, buf)
-    test_collector = Collector(policy, test_envs)
+
     # policy.set_eps(1)
     train_collector.collect(n_step=args.batch_size)
     # log
@@ -104,7 +106,7 @@ def test_dqn(args=get_args()):
     if __name__ == '__main__':
         pprint.pprint(result)
         # Let's watch its performance!
-        env = gym.make(args.task)
+        # env = gym.make(args.task)
         policy.eval()
         policy.set_eps(args.eps_test)
         collector = Collector(policy, env)

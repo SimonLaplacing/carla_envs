@@ -87,8 +87,8 @@ class Create_Envs(object):
         ego_collision = SS.CollisionSensor(ego)
         npc_collision = SS.CollisionSensor(npc)
         # lane_invasion = SS.LaneInvasionSensor(ego)
-        sensor_list.append(ego_collision.sensor)
-        sensor_list.append(npc_collision.sensor)
+        sensor_list.append(ego_collision)
+        sensor_list.append(npc_collision)
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
@@ -172,11 +172,12 @@ def main():
 
             sim_time = 0  # 仿真时间
             start_time = time.time()  # 初始时间
+            state = state_space[1]
             action= [random.choice(action_space),random.choice(action_space)]
-            # egocol_list = ego_collision.get_collision_history()
-            # npccol_list = npc_collision.get_collision_history()
+            egocol_list = sensor_list[0].get_collision_history()
+            npccol_list = sensor_list[1].get_collision_history()
             
-            while sim_time < 15:  # 仿真时间限制
+            while state:  # 仿真时间限制
                 sim_time = time.time() - start_time
                 
                 create_envs.get_ego_step(ego_list[0],action[0],sim_time)       
@@ -184,15 +185,17 @@ def main():
                 # npc.apply_control(set_control)
                 # for vehicle in actor_list:
                 #     vehicle.set_autopilot(True)
-            
-            reward = create_envs.get_reward(reward,move)
+                if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
+                    state = state_space[0]
+
+            reward = create_envs.get_reward(reward,action)
             print(reward)
             # 仿真时间设置
             time.sleep(1)
 
             for x in sensor_list:
                 if x is not None:
-                    x.destroy()            
+                    x.sensor.destroy()            
             for x in ego_list:
                 if x is not None:
                     client.apply_batch([carla.command.DestroyActor(x)])
@@ -207,10 +210,10 @@ def main():
             print('Reset')
     except:
         # 清洗环境
-        print('destroying actors')
+        print('Start Cleaning Envs')
         for x in sensor_list:
             if x is not None:
-                x.destroy()
+                x.sensor.destroy()
         for x in ego_list:
             if x is not None:
                 client.apply_batch([carla.command.DestroyActor(x)])
@@ -220,7 +223,7 @@ def main():
         for x in obstacle_list:
             if x is not None:
                 client.apply_batch([carla.command.DestroyActor(x)])
-        print('done!')
+        print('all clean, simulation done!')
 
 if __name__ == '__main__':
 
