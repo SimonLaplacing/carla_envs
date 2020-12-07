@@ -3,7 +3,6 @@ import os
 import sys
 import Simple_Sensors as SS
 import numpy as np
-
 try:
     sys.path.append(glob.glob('E:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
@@ -159,6 +158,7 @@ class Create_Envs(object):
         return reward
 
 def main():
+    # init
     reward = 0
     cyc = 5
     create_envs = Create_Envs()
@@ -168,6 +168,7 @@ def main():
 
     try:
         while cyc:
+            # reset
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
             sim_time = 0  # 仿真时间
@@ -177,6 +178,7 @@ def main():
             egocol_list = sensor_list[0].get_collision_history()
             npccol_list = sensor_list[1].get_collision_history()
             
+            # action
             while state:  # 仿真时间限制
                 sim_time = time.time() - start_time
                 
@@ -188,6 +190,7 @@ def main():
                 if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
                     state = state_space[0]
 
+            # reward
             reward = create_envs.get_reward(reward,action)
             print(reward)
             # 仿真时间设置
