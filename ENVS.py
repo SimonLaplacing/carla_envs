@@ -1,10 +1,9 @@
 import glob
 import os
 import sys
-import Simple_Sensors as SS
 import numpy as np
 try:
-    sys.path.append(glob.glob('E:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('D:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -18,6 +17,8 @@ import random
 import time
 import copy
 
+import Simple_Sensors as SS
+import DQN_model as model 
 
 class Create_Envs(object):
 
@@ -174,6 +175,10 @@ def main():
             sim_time = 0  # 仿真时间
             start_time = time.time()  # 初始时间
             state = state_space[1]
+
+            dqn = model.DQN()
+            action = dqn.choose_action(state)
+
             action= [random.choice(action_space),random.choice(action_space)]
             egocol_list = sensor_list[0].get_collision_history()
             npccol_list = sensor_list[1].get_collision_history()
