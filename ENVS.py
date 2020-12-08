@@ -92,7 +92,7 @@ class Create_Envs(object):
 
     # 车辆控制
     def get_ego_step(self,ego,action,sim_time): # 1变道 2刹车
-        if action == 1:
+        if action == 0:
             if 0 < sim_time <= 1.2:
                 ego_control = carla.VehicleControl(throttle = 0, steer = 0)
                 ego.apply_control(ego_control) 
@@ -109,7 +109,7 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = 1, steer = 0)
                 ego.apply_control(ego_control)
         
-        if action == 2:
+        if action == 1:
             if 0 < sim_time <= 6:
                 ego_control = carla.VehicleControl(throttle = 0.9, steer = 0)
                 ego.apply_control(ego_control) 
@@ -119,18 +119,18 @@ class Create_Envs(object):
             
 
     def get_npc_step(self,npc,action,sim_time): # 1刹车 2加速
-        if action == 1:
+        if action == 0:
             if 0 < sim_time <= 6:
                 npc_control = carla.VehicleControl(throttle = 1)
                 npc.apply_control(npc_control)
             elif 6 < sim_time <= 7:
-                npc_control = carla.VehicleControl(throttle = 0, brake = 0.3)
+                npc_control = carla.VehicleControl(throttle = 0, brake = 0.2)
                 npc.apply_control(npc_control)                     
             else:
                 npc_control = carla.VehicleControl(throttle = 0.5, brake = 0)
                 npc.apply_control(npc_control)
 
-        if action == 2:
+        if action == 1:
             if 0 < sim_time <= 2:
                 npc_control = carla.VehicleControl(throttle = 1)
                 npc.apply_control(npc_control) 
@@ -139,7 +139,7 @@ class Create_Envs(object):
                 npc.apply_control(npc_control)
 
     def get_action_space(self):
-        action_space = np.array([1,2])
+        action_space = np.array([0,1])
         return action_space
     
     def get_state_space(self):
@@ -147,11 +147,11 @@ class Create_Envs(object):
         return state_space
 
     def get_reward(self,action):  
-        if action == [1,2]:
+        if action == [0,1]:
             reward = -200
-        elif action == [1,1]:
+        elif action == [0,0]:
             reward = 4
-        elif action == [2,2]:
+        elif action == [1,1]:
             reward = 2
         else:
             reward = 1

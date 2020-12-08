@@ -24,19 +24,17 @@ import carla
 
 # hyper-parameters
 create_envs = ENVS.Create_Envs()
-BATCH_SIZE = 10
+BATCH_SIZE = 5
 LR = 0.01
 GAMMA = 0.90
 EPISILO = 0.9
-MEMORY_CAPACITY = 20
-Q_NETWORK_ITERATION = 80
+MEMORY_CAPACITY = 10
+Q_NETWORK_ITERATION = 10
 
-# env = gym.make("CartPole-v0")
-# env = env.unwrapped
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 NUM_ACTIONS = len(action_space)
-NUM_STATES = len(state_space)-1
+NUM_STATES = len(state_space) - 1
 
 class Net(nn.Module):
     """docstring for Net"""
@@ -46,7 +44,7 @@ class Net(nn.Module):
         self.fc1.weight.data.normal_(0,0.1)
         self.fc2 = nn.Linear(10,5)
         self.fc2.weight.data.normal_(0,0.1)
-        self.out = nn.Linear(10,NUM_ACTIONS)
+        self.out = nn.Linear(5,NUM_ACTIONS)
         self.out.weight.data.normal_(0,0.1)
 
     def forward(self,x):
@@ -66,7 +64,7 @@ class DQN():
         self.learn_step_counter = 0
         self.memory_counter = 0
         self.memory = np.zeros((MEMORY_CAPACITY, NUM_STATES * 2 + 2))
-        # why the NUM_STATE*2 +2
+        # why the NUM_STATE*2 + 2
         # When we store the memory, we put the state, action, reward and next_state in the memory
         # here reward and action is a number, state is a ndarray
         self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
@@ -92,7 +90,8 @@ class DQN():
     def learn(self):
 
         #update the parameters
-        if self.learn_step_counter % Q_NETWORK_ITERATION ==0:
+        if self.learn_step_counter % Q_NETWORK_ITERATION == 0:
+            print('update network parameters')
             self.target_net.load_state_dict(self.eval_net.state_dict())
         self.learn_step_counter+=1
 
@@ -119,42 +118,49 @@ class DQN():
 def main():
     ego_dqn = DQN()
     npc_dqn = DQN()
-    episodes = 50
+    episodes = 30
     print("Collecting Experience....")
-    # reward_list = []
+    reward_list = []
 
     try:
         for i in range(episodes):
+            print('%dth time learning begins'%i)
             ep_reward = 0
             client, world, blueprint_library = create_envs.connection()
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             sim_time = 0  # 仿真时间
             start_time = time.time()  # 初始时间
             state = state_space[1]
-            # state = env.reset()
+
             egocol_list = sensor_list[0].get_collision_history()
             npccol_list = sensor_list[1].get_collision_history()
             ego_action = ego_dqn.choose_action(state)
             npc_action = npc_dqn.choose_action(state)
-            reward = create_envs.get_reward([ego_action,npc_action])
+            action = [ego_action,npc_action]
+            print('action is',action)
+            reward = create_envs.get_reward(action)
 
-            dqn.store_transition(1, action, reward, 0)
+            ego_dqn.store_transition(state_space[1], ego_action, reward, state_space[0])
+            npc_dqn.store_transition(state_space[1], npc_action, reward, state_space[0])
             ep_reward += reward
+            print('reward of %dth episode is %d'%(i, ep_reward))
 
-            if dqn.memory_counter >= MEMORY_CAPACITY:
-                dqn.learn()
+            if ego_dqn.memory_counter >= MEMORY_CAPACITY:
+                print('start training')
+                ego_dqn.learn()
+            if npc_dqn.memory_counter >= MEMORY_CAPACITY:
+                npc_dqn.learn()            
             r = copy.copy(reward)
-            # reward_list.append(r)
+            reward_list.append(r)
+            time.sleep(1)
             
             # action
             while state:  
                 sim_time = time.time() - start_time
                 
-                create_envs.get_ego_step(ego_list[0],action,sim_time)       
-                create_envs.get_npc_step(npc_list[0],action,sim_time)
-                # npc.apply_control(set_control)
-                # for vehicle in actor_list:
-                #     vehicle.set_autopilot(True)
+                create_envs.get_ego_step(ego_list[0],ego_action,sim_time)       
+                create_envs.get_npc_step(npc_list[0],npc_action,sim_time)
+
                 if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
                     state = state_space[0]
 
@@ -175,8 +181,11 @@ def main():
                     client.apply_batch([carla.command.DestroyActor(x)])
 
             print('Reset')
-    except:
-    # 清洗环境
+    finally:
+        x = np.linspace(0,len(reward_list),len(reward_list))
+        plt.plot(x,reward_list)
+        plt.show()
+        # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
             if x is not None:
