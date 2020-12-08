@@ -1,3 +1,7 @@
+import glob
+import os
+import sys
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,30 +9,44 @@ import numpy as np
 import gym
 import matplotlib.pyplot as plt
 import copy
+import ENVS
+import time
+
+try:
+    sys.path.append(glob.glob('D:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+except IndexError:
+    pass
+
+import carla
 
 # hyper-parameters
-BATCH_SIZE = 128
+create_envs = ENVS.Create_Envs()
+BATCH_SIZE = 10
 LR = 0.01
 GAMMA = 0.90
 EPISILO = 0.9
-MEMORY_CAPACITY = 2000
-Q_NETWORK_ITERATION = 100
+MEMORY_CAPACITY = 20
+Q_NETWORK_ITERATION = 80
 
-env = gym.make("CartPole-v0")
-env = env.unwrapped
-NUM_ACTIONS = env.action_space.n
-NUM_STATES = env.observation_space.shape[0]
-ENV_A_SHAPE = 0 if isinstance(env.action_space.sample(), int) else env.action_space.sample.shape
+# env = gym.make("CartPole-v0")
+# env = env.unwrapped
+action_space = create_envs.get_action_space()
+state_space = create_envs.get_state_space()
+NUM_ACTIONS = len(action_space)
+NUM_STATES = len(state_space)-1
 
 class Net(nn.Module):
     """docstring for Net"""
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(NUM_STATES, 50)
+        self.fc1 = nn.Linear(NUM_STATES, 10)
         self.fc1.weight.data.normal_(0,0.1)
-        self.fc2 = nn.Linear(50,30)
+        self.fc2 = nn.Linear(10,5)
         self.fc2.weight.data.normal_(0,0.1)
-        self.out = nn.Linear(30,NUM_ACTIONS)
+        self.out = nn.Linear(10,NUM_ACTIONS)
         self.out.weight.data.normal_(0,0.1)
 
     def forward(self,x):
@@ -59,10 +77,8 @@ class DQN():
         if np.random.randn() <= EPISILO:# greedy policy
             action_value = self.eval_net.forward(state)
             action = torch.max(action_value, 1)[1].data.numpy()
-            action = action[0] if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
         else: # random policy
-            action = np.random.randint(0,NUM_ACTIONS)
-            action = action if ENV_A_SHAPE ==0 else action.reshape(ENV_A_SHAPE)
+            action = np.random.choice(action_space)
         return action
 
 
@@ -91,52 +107,90 @@ class DQN():
         #q_eval
         q_eval = self.eval_net(batch_state).gather(1, batch_action)
         q_next = self.target_net(batch_next_state).detach()
-        q_target = batch_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)
+        # q_target = batch_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)
+        q_target = batch_reward
         loss = self.loss_func(q_eval, q_target)
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-def reward_func(env, x, x_dot, theta, theta_dot):
-    r1 = (env.x_threshold - abs(x))/env.x_threshold - 0.5
-    r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
-    reward = r1 + r2
-    return reward
 
 def main():
-    dqn = DQN()
-    episodes = 20
+    ego_dqn = DQN()
+    npc_dqn = DQN()
+    episodes = 50
     print("Collecting Experience....")
-    reward_list = []
-    plt.ion()
-    fig, ax = plt.subplots()
-    for i in range(episodes):
-        state = env.reset()
-        ep_reward = 0
-        while True:
-            env.render()
-            action = dqn.choose_action(state)
-            next_state, _ , done, info = env.step(action)
-            x, x_dot, theta, theta_dot = next_state
-            reward = reward_func(env, x, x_dot, theta, theta_dot)
+    # reward_list = []
 
-            dqn.store_transition(state, action, reward, next_state)
+    try:
+        for i in range(episodes):
+            ep_reward = 0
+            client, world, blueprint_library = create_envs.connection()
+            ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
+            sim_time = 0  # 仿真时间
+            start_time = time.time()  # 初始时间
+            state = state_space[1]
+            # state = env.reset()
+            egocol_list = sensor_list[0].get_collision_history()
+            npccol_list = sensor_list[1].get_collision_history()
+            ego_action = ego_dqn.choose_action(state)
+            npc_action = npc_dqn.choose_action(state)
+            reward = create_envs.get_reward([ego_action,npc_action])
+
+            dqn.store_transition(1, action, reward, 0)
             ep_reward += reward
 
             if dqn.memory_counter >= MEMORY_CAPACITY:
                 dqn.learn()
-                if done:
-                    print("episode: {} , the episode reward is {}".format(i, round(ep_reward, 3)))
-            if done:
-                break
-            state = next_state
-        r = copy.copy(reward)
-        reward_list.append(r)
-        ax.set_xlim(0,300)
-        #ax.cla()
-        ax.plot(reward_list, 'g-', label='total_loss')
-        plt.pause(0.001)
+            r = copy.copy(reward)
+            # reward_list.append(r)
+            
+            # action
+            while state:  
+                sim_time = time.time() - start_time
+                
+                create_envs.get_ego_step(ego_list[0],action,sim_time)       
+                create_envs.get_npc_step(npc_list[0],action,sim_time)
+                # npc.apply_control(set_control)
+                # for vehicle in actor_list:
+                #     vehicle.set_autopilot(True)
+                if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
+                    state = state_space[0]
+
+            # print(reward)
+            time.sleep(1)
+
+            for x in sensor_list:
+                if x is not None:
+                    x.sensor.destroy()            
+            for x in ego_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in npc_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in obstacle_list:
+                if x is not None:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+
+            print('Reset')
+    except:
+    # 清洗环境
+        print('Start Cleaning Envs')
+        for x in sensor_list:
+            if x is not None:
+                x.sensor.destroy()
+        for x in ego_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in npc_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in obstacle_list:
+            if x is not None:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        print('all clean, simulation done!')
 
 if __name__ == '__main__':
 

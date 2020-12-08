@@ -18,7 +18,6 @@ import time
 import copy
 
 import Simple_Sensors as SS
-import DQN_model as model 
 
 class Create_Envs(object):
 
@@ -147,92 +146,13 @@ class Create_Envs(object):
         state_space = np.array([0,1])
         return state_space
 
-    def get_reward(self,reward,move):  
-        if move == [1,2]:
-            reward += -200
-        elif move == [1,1]:
-            reward += 4
-        elif move == [2,2]:
-            reward += 2
+    def get_reward(self,action):  
+        if action == [1,2]:
+            reward = -200
+        elif action == [1,1]:
+            reward = 4
+        elif action == [2,2]:
+            reward = 2
         else:
-            reward += 1
+            reward = 1
         return reward
-
-def main():
-    # init
-    reward = 0
-    cyc = 5
-    create_envs = Create_Envs()
-    client, world, blueprint_library = create_envs.connection()
-    action_space = create_envs.get_action_space()
-    state_space = create_envs.get_state_space()
-
-    try:
-        while cyc:
-            # reset
-            ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-
-            sim_time = 0  # 仿真时间
-            start_time = time.time()  # 初始时间
-            state = state_space[1]
-
-            dqn = model.DQN()
-            action = dqn.choose_action(state)
-
-            action= [random.choice(action_space),random.choice(action_space)]
-            egocol_list = sensor_list[0].get_collision_history()
-            npccol_list = sensor_list[1].get_collision_history()
-            
-            # action
-            while state:  # 仿真时间限制
-                sim_time = time.time() - start_time
-                
-                create_envs.get_ego_step(ego_list[0],action[0],sim_time)       
-                create_envs.get_npc_step(npc_list[0],action[1],sim_time)
-                # npc.apply_control(set_control)
-                # for vehicle in actor_list:
-                #     vehicle.set_autopilot(True)
-                if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
-                    state = state_space[0]
-
-            # reward
-            reward = create_envs.get_reward(reward,action)
-            print(reward)
-            # 仿真时间设置
-            time.sleep(1)
-
-            for x in sensor_list:
-                if x is not None:
-                    x.sensor.destroy()            
-            for x in ego_list:
-                if x is not None:
-                    client.apply_batch([carla.command.DestroyActor(x)])
-            for x in npc_list:
-                if x is not None:
-                    client.apply_batch([carla.command.DestroyActor(x)])
-            for x in obstacle_list:
-                if x is not None:
-                    client.apply_batch([carla.command.DestroyActor(x)])
-
-            cyc -= 1
-            print('Reset')
-    except:
-        # 清洗环境
-        print('Start Cleaning Envs')
-        for x in sensor_list:
-            if x is not None:
-                x.sensor.destroy()
-        for x in ego_list:
-            if x is not None:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in npc_list:
-            if x is not None:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in obstacle_list:
-            if x is not None:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        print('all clean, simulation done!')
-
-if __name__ == '__main__':
-
-    main()
