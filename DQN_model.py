@@ -9,7 +9,7 @@ import numpy as np
 import gym
 import matplotlib.pyplot as plt
 import copy
-import ENVS
+import DQN_ENVS
 import time
 
 try:
@@ -23,13 +23,13 @@ except IndexError:
 import carla
 
 # hyper-parameters
-create_envs = ENVS.Create_Envs()
-BATCH_SIZE = 5
+create_envs = DQN_ENVS.Create_Envs()
+BATCH_SIZE = 10
 LR = 0.01
 GAMMA = 0.90
 EPISILO = 0.9
-MEMORY_CAPACITY = 10
-Q_NETWORK_ITERATION = 10
+MEMORY_CAPACITY = 20 # when to train
+Q_NETWORK_ITERATION = 10 # when to update
 
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
@@ -40,12 +40,12 @@ class Net(nn.Module):
     """docstring for Net"""
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(NUM_STATES, 10)
-        self.fc1.weight.data.normal_(0,0.1)
-        self.fc2 = nn.Linear(10,5)
-        self.fc2.weight.data.normal_(0,0.1)
-        self.out = nn.Linear(5,NUM_ACTIONS)
-        self.out.weight.data.normal_(0,0.1)
+        self.fc1 = nn.Linear(NUM_STATES, 10) # linear层1
+        self.fc1.weight.data.normal_(0,0.1)  # 初始化参数
+        self.fc2 = nn.Linear(10,5)           # linear层2
+        self.fc2.weight.data.normal_(0,0.1)  # 初始化参数
+        self.out = nn.Linear(5,NUM_ACTIONS)  # 输出层
+        self.out.weight.data.normal_(0,0.1)  # 初始化参数
 
     def forward(self,x):
         x = self.fc1(x)
@@ -118,7 +118,7 @@ class DQN():
 def main():
     ego_dqn = DQN()
     npc_dqn = DQN()
-    episodes = 30
+    episodes = 100
     print("Collecting Experience....")
     reward_list = []
 
@@ -182,6 +182,9 @@ def main():
 
             print('Reset')
     finally:
+        rew = open('reward.txt','w+')
+        rew.write(str(reward_list))
+        rew.close()
         x = np.linspace(0,len(reward_list),len(reward_list))
         plt.plot(x,reward_list)
         plt.show()

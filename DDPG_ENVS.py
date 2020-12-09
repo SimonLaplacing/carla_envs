@@ -60,7 +60,7 @@ class Create_Envs(object):
         # npc设置--------------------------------------------------------------------
         npc_transform = ego_transform
         for i in range(1):
-            npc_transform.location += carla.Location(x=-20,y=-3.5)
+            npc_transform.location += carla.Location(x=-15,y=-3.5)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             npc = world.try_spawn_actor(npc_bp, npc_transform)
             if npc is None:
@@ -72,7 +72,7 @@ class Create_Envs(object):
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = ego_transform
         for i in range(1):
-            obstacle_transform.location += carla.Location(x=100,y=3.7)
+            obstacle_transform.location += carla.Location(x=95,y=3.7)
             obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
             # bp = random.choice(blueprint_library.filter('vehicle'))
             obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
@@ -148,9 +148,9 @@ class Create_Envs(object):
 
     def get_reward(self,action):  
         if action == [0,1]:
-            reward = -200
+            reward = -10
         elif action == [0,0]:
-            reward = 4
+            reward = 8
         elif action == [1,1]:
             reward = 2
         else:
