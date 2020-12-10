@@ -85,74 +85,32 @@ class Create_Envs(object):
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
         npc_collision = SS.CollisionSensor(npc)
-        # lane_invasion = SS.LaneInvasionSensor(ego)
-        sensor_list.append(ego_collision)
-        sensor_list.append(npc_collision)
+        ego_invasion = SS.LaneInvasionSensor(ego)
+        npc_invasion = SS.LaneInvasionSensor(npc)
+        sensor_list.extend([ego_collision,npc_collision,ego_invasion,npc_invasion])
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_ego_step(self,ego,action,sim_time): # 1变道 2刹车
-        if action == 0:
-            if 0 < sim_time <= 1.2:
-                ego_control = carla.VehicleControl(throttle = 0, steer = 0)
-                ego.apply_control(ego_control) 
-            elif 7 < sim_time <= 7.7:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = -0.1)
-                ego.apply_control(ego_control)                
-            elif 7.7 < sim_time <= 8.4:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = 0.1)
-                ego.apply_control(ego_control)
-            elif sim_time > 8.4:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = 0)
-                ego.apply_control(ego_control)
-            else:
-                ego_control = carla.VehicleControl(throttle = 1, steer = 0)
-                ego.apply_control(ego_control)
-        
-        if action == 1:
-            if 0 < sim_time <= 6:
-                ego_control = carla.VehicleControl(throttle = 0.9, steer = 0)
-                ego.apply_control(ego_control) 
-            else:
-                ego_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0.3)
-                ego.apply_control(ego_control)
-            
-
-    def get_npc_step(self,npc,action,sim_time): # 1刹车 2加速
-        if action == 0:
-            if 0 < sim_time <= 6:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control)
-            elif 6 < sim_time <= 7:
-                npc_control = carla.VehicleControl(throttle = 0, brake = 0.2)
-                npc.apply_control(npc_control)                     
-            else:
-                npc_control = carla.VehicleControl(throttle = 0.5, brake = 0)
-                npc.apply_control(npc_control)
-
-        if action == 1:
-            if 0 < sim_time <= 2:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control) 
-            else:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control)
+    def get_vehicle_step(self,vehicle,action,sim_time): # 
+        throttle,brake,steer = action
+        vehicle_control = carla.VehicleControl(throttle = throttle, steer = steer, brake = brake)
+        vehicle.apply_control(vehicle_control) 
 
     def get_action_space(self):
-        action_space = np.array([0,1])
+        action_space = [0,0,0] # 油门、方向盘、刹车
         return action_space
     
-    def get_state_space(self):
-        state_space = np.array([0,1])
+    # 车辆状态
+    def get_state(self,actor):
+        state = actor.get_transform()
+        state = [state.location.x,state.location.y,state.location.z,
+        state.rotation.pitch,state.rotation.yaw,state.rotation.roll]
+        return state
+    
+    def get_state_space(self,actor):
+        state_space = [0,0,0,0,0,0] # x,y,z,pitch,yaw,roll
         return state_space
 
-    def get_reward(self,action):  
-        if action == [0,1]:
-            reward = -10
-        elif action == [0,0]:
-            reward = 8
-        elif action == [1,1]:
-            reward = 2
-        else:
-            reward = 1
-        return reward
+    def get_reward(self,action,sensor_list):  
+        sensor_list
+

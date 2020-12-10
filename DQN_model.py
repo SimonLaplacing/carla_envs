@@ -40,11 +40,11 @@ class Net(nn.Module):
     """docstring for Net"""
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(NUM_STATES, 10) # linear层1
+        self.fc1 = nn.Linear(NUM_STATES, 15) # linear层1
         self.fc1.weight.data.normal_(0,0.1)  # 初始化参数
-        self.fc2 = nn.Linear(10,5)           # linear层2
+        self.fc2 = nn.Linear(15,8)           # linear层2
         self.fc2.weight.data.normal_(0,0.1)  # 初始化参数
-        self.out = nn.Linear(5,NUM_ACTIONS)  # 输出层
+        self.out = nn.Linear(8,NUM_ACTIONS)  # 输出层
         self.out.weight.data.normal_(0,0.1)  # 初始化参数
 
     def forward(self,x):
@@ -168,16 +168,16 @@ def main():
             time.sleep(1)
 
             for x in sensor_list:
-                if x is not None:
+                if x.sensor.is_alive:
                     x.sensor.destroy()            
             for x in ego_list:
-                if x is not None:
+                if x.is_alive:
                     client.apply_batch([carla.command.DestroyActor(x)])
             for x in npc_list:
-                if x is not None:
+                if x.is_alive:
                     client.apply_batch([carla.command.DestroyActor(x)])
             for x in obstacle_list:
-                if x is not None:
+                if x.is_alive:
                     client.apply_batch([carla.command.DestroyActor(x)])
 
             print('Reset')
@@ -191,16 +191,16 @@ def main():
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
-            if x is not None:
+            if x.sensor.is_alive:
                 x.sensor.destroy()
         for x in ego_list:
-            if x is not None:
+            if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
         for x in npc_list:
-            if x is not None:
+            if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
         for x in obstacle_list:
-            if x is not None:
+            if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
         print('all clean, simulation done!')
 

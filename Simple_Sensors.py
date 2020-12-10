@@ -46,7 +46,6 @@ class CollisionSensor(object):
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
 
     def get_collision_history(self):
-        """Gets the history of collisions"""
         return self.history
 
     @staticmethod
@@ -56,8 +55,6 @@ class CollisionSensor(object):
         if not self:
             return
         self.history[0] = 1
-        if len(self.history) > 4000:
-            self.history.pop(0)
 
 # ==============================================================================
 # -- LaneInvasionSensor --------------------------------------------------------
@@ -70,6 +67,7 @@ class LaneInvasionSensor(object):
     def __init__(self, parent_actor):
         """Constructor method"""
         self.sensor = None
+        self.history = [0]
         self._parent = parent_actor
         world = self._parent.get_world()
         bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
@@ -79,10 +77,13 @@ class LaneInvasionSensor(object):
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
 
+    def get_invasion_history(self):
+        return self.history
+
     @staticmethod
     def _on_invasion(weak_self, event):
         """On invasion method"""
         self = weak_self()
         if not self:
             return
-        # print('lane invasion')
+        self.history[0] = 1
