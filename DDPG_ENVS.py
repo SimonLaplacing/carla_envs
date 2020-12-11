@@ -94,20 +94,19 @@ class Create_Envs(object):
     def get_vehicle_step(self,vehicle,action,sim_time): # 
         throttle,brake,steer = action
         vehicle_control = carla.VehicleControl(throttle = throttle, steer = steer, brake = brake)
-        vehicle.apply_control(vehicle_control) 
+        vehicle.apply_control(vehicle_control)
+        time.sleep(sim_time)
+        next_state = vehicle.get_transform()
+        next_state = [next_state.location.x,next_state.location.y,next_state.location.z,
+        next_state.rotation.pitch,next_state.rotation.yaw,next_state.rotation.roll]
+        return next_state 
 
     def get_action_space(self):
-        action_space = [0,0,0] # 油门、方向盘、刹车
+        action_space = np.array([[0,1],[-1,1],[0,1]]) # 油门、方向盘、刹车
         return action_space
     
     # 车辆状态
-    def get_state(self,actor):
-        state = actor.get_transform()
-        state = [state.location.x,state.location.y,state.location.z,
-        state.rotation.pitch,state.rotation.yaw,state.rotation.roll]
-        return state
-    
-    def get_state_space(self,actor):
+    def get_state_space(self):
         state_space = [0,0,0,0,0,0] # x,y,z,pitch,yaw,roll
         return state_space
 

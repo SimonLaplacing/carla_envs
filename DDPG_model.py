@@ -1,16 +1,33 @@
+import glob
+import os
+import sys
+
 import argparse
 from itertools import count
 
-import os, sys, random
+import random
 import numpy as np
 
-import gym
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
 from tensorboardX import SummaryWriter
+import matplotlib.pyplot as plt
+import copy
+import DDPG_ENVS
+import time
+
+try:
+    sys.path.append(glob.glob('D:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+except IndexError:
+    pass
+
+import carla
 
 
 
@@ -19,7 +36,7 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 # OpenAI gym environment name, # ['BipedalWalker-v2', 'Pendulum-v0'] or any continuous environment
 # Note that DDPG is feasible about hyper-parameters.
 # You should fine-tuning if you change to another environment.
-parser.add_argument("--env_name", default="Pendulum-v0")
+# parser.add_argument("--env_name", default="Pendulum-v0")
 parser.add_argument('--tau',  default=0.005, type=float) # target smoothing coefficient
 parser.add_argument('--target_update_interval', default=1, type=int)
 parser.add_argument('--test_iteration', default=10, type=int)
@@ -45,19 +62,22 @@ args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
-env = gym.make(args.env_name)
+# env = gym.make(args.env_name)
 
 if args.seed:
-    env.seed(args.random_seed)
     torch.manual_seed(args.random_seed)
     np.random.seed(args.random_seed)
 
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.shape[0]
-max_action = float(env.action_space.high[0])
-min_Val = torch.tensor(1e-7).float().to(device) # min value
+create_envs = DDPG_ENVS.Create_Envs()
+action_space = create_envs.get_action_space()
+state_space = create_envs.get_state_space()
+state_dim = len(state_space)
+action_dim = len(action_space)
+max_action = float(action_space[...,1])
+min_Val = float(action_space[...,0])
+# min_Val = torch.tensor(1e-7).float().to(device) # min value
 
-directory = './exp' + script_name + args.env_name +'./'
+directory = './carla-' + 'DDPG' +'./'
 
 class Replay_buffer():
     '''
@@ -206,53 +226,124 @@ class DDPG(object):
         print("====================================")
 
 def main():
-    agent = DDPG(state_dim, action_dim, max_action)
+    ego_DDPG = DDPG(state_dim, action_dim, max_action)
+    npc_DDPG = DDPG(state_dim, action_dim, max_action)
     ep_r = 0
-    if args.mode == 'test':
-        agent.load()
-        for i in range(args.test_iteration):
-            state = env.reset()
-            for t in count():
-                action = agent.select_action(state)
-                next_state, reward, done, info = env.step(np.float32(action))
-                ep_r += reward
-                env.render()
-                if done or t >= args.max_length_of_trajectory:
-                    print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
-                    ep_r = 0
-                    break
-                state = next_state
+    client, world, blueprint_library = create_envs.connection()
+    print("Collecting Experience....")
+    reward_list = []
 
-    elif args.mode == 'train':
-        if args.load: agent.load()
-        total_step = 0
-        for i in range(args.max_episode):
-            total_reward = 0
-            step =0
-            state = env.reset()
-            for t in count():
-                action = agent.select_action(state)
-                action = (action + np.random.normal(0, args.exploration_noise, size=env.action_space.shape[0])).clip(
-                    env.action_space.low, env.action_space.high)
+    try:
+        if args.mode == 'test':
+            ego_DDPG.load()
+            ego_DDPG.load()
+            for i in range(args.test_iteration):
+                print('%dth time learning begins'%i)
+                ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
+                sim_time = 0  # 仿真时间
+                start_time = time.time()  # 初始时间
 
-                next_state, reward, done, info = env.step(action)
-                if args.render and i >= args.render_interval : env.render()
-                agent.replay_buffer.push((state, next_state, action, reward, np.float(done)))
+                egocol_list = sensor_list[0].get_collision_history()
+                npccol_list = sensor_list[1].get_collision_history()
 
-                state = next_state
-                if done:
-                    break
-                step += 1
-                total_reward += reward
-            total_step += step+1
-            print("Total T:{} Episode: \t{} Total Reward: \t{:0.2f}".format(total_step, i, total_reward))
-            agent.update()
-           # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
+                for t in count():
+                    action = ego_DDPG.select_action(state)
+                    next_state, reward, done, info = create_envs.get_vehicle_step(np.float32(action))
+                    ep_r += reward
+                    if done or t >= args.max_length_of_trajectory:
+                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
+                        ep_r = 0
+                        break
+                    state = next_state
 
-            if i % args.log_interval == 0:
-                agent.save()
-    else:
-        raise NameError("mode wrong!!!")
+        elif args.mode == 'train':
+            if args.load: ego_DDPG.load()
+            total_step = 0
+            for i in range(args.max_episode):
+                total_reward = 0
+                step =0
+                print('%dth time learning begins'%i)
+                ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
+                sim_time = 0  # 仿真时间
+                start_time = time.time()  # 初始时间
+
+                egocol_state = sensor_list[0].get_collision_history()
+                npccol_state = sensor_list[1].get_collision_history()
+                for t in count():
+                    action = ego_DDPG.select_action(state)
+                    action = (action + np.random.normal(0, args.exploration_noise, size=action_space)).clip(
+                        max_action, min_Val)
+
+                    next_state = create_envs.get_vehicle_step(ego_list[0],action,t)
+                    
+                    # if args.render and i >= args.render_interval : env.render()
+                    ego_DDPG.replay_buffer.push((state, next_state, action, reward, np.float(done)))
+
+                    state = next_state
+                    if done:
+                        break
+                    step += 1
+                    total_reward += reward
+                total_step += step+1
+                print("Total T:{} Episode: \t{} Total Reward: \t{:0.2f}".format(total_step, i, total_reward))
+                ego_DDPG.update()
+            # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
+
+                if i % args.log_interval == 0:
+                    ego_DDPG.save()
+
+        else:
+            raise NameError("mode wrong!!!")
+
+        time.sleep(1)
+            
+        # action
+        while state:  
+            sim_time = time.time() - start_time
+            if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
+                state = state_space[0]
+
+        # print(reward)
+        time.sleep(1)
+
+        for x in sensor_list:
+            if x.sensor.is_alive:
+                x.sensor.destroy()            
+        for x in ego_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in npc_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in obstacle_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+
+        print('Reset')
+
+    finally:
+        rew = open('reward.txt','w+')
+        rew.write(str(reward_list))
+        rew.close()
+        x = np.linspace(0,len(reward_list),len(reward_list))
+        plt.plot(x,reward_list)
+        plt.show()
+        # 清洗环境
+        print('Start Cleaning Envs')
+        for x in sensor_list:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
+        for x in ego_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in npc_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        for x in obstacle_list:
+            if x.is_alive:
+                client.apply_batch([carla.command.DestroyActor(x)])
+        print('all clean, simulation done!')
+
 
 if __name__ == '__main__':
     main()

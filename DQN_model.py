@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import gym
 import matplotlib.pyplot as plt
 import copy
 import DQN_ENVS
@@ -23,7 +22,7 @@ except IndexError:
 import carla
 
 # hyper-parameters
-create_envs = DQN_ENVS.Create_Envs()
+
 BATCH_SIZE = 10
 LR = 0.01
 GAMMA = 0.90
@@ -31,6 +30,7 @@ EPISILO = 0.9
 MEMORY_CAPACITY = 20 # when to train
 Q_NETWORK_ITERATION = 10 # when to update
 
+create_envs = DQN_ENVS.Create_Envs()
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 NUM_ACTIONS = len(action_space)
@@ -119,13 +119,14 @@ def main():
     ego_dqn = DQN()
     npc_dqn = DQN()
     episodes = 100
+    ep_reward = 0
+    client, world, blueprint_library = create_envs.connection()
     print("Collecting Experience....")
     reward_list = []
 
     try:
         for i in range(episodes):
             print('%dth time learning begins'%i)
-            ep_reward = 0
             client, world, blueprint_library = create_envs.connection()
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             sim_time = 0  # 仿真时间
