@@ -40,7 +40,7 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 parser.add_argument('--tau',  default=0.005, type=float) # target smoothing coefficient
 parser.add_argument('--target_update_interval', default=1, type=int)
 parser.add_argument('--test_iteration', default=10, type=int)
-
+parser.add_argument('--max_length_of_trajectory', default=5, type=int)
 parser.add_argument('--learning_rate', default=1e-4, type=float)
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=1000000, type=int) # replay buffer size
@@ -50,19 +50,19 @@ parser.add_argument('--random_seed', default=9527, type=int)
 # optional parameters
 
 parser.add_argument('--sample_frequency', default=2000, type=int)
-parser.add_argument('--render', default=False, type=bool) # show UI or not
+# parser.add_argument('--render', default=False, type=bool) # show UI or not
 parser.add_argument('--log_interval', default=50, type=int) #
 parser.add_argument('--load', default=False, type=bool) # load model
-parser.add_argument('--render_interval', default=100, type=int) # after render_interval, the env.render() will work
+# parser.add_argument('--render_interval', default=100, type=int) # after render_interval, the env.render() will work
 parser.add_argument('--exploration_noise', default=0.1, type=float)
-parser.add_argument('--max_episode', default=100000, type=int) # num of games
+parser.add_argument('--max_episode', default=100, type=int) # num of games
 parser.add_argument('--print_log', default=5, type=int)
-parser.add_argument('--update_iteration', default=200, type=int)
+parser.add_argument('--update_iteration', default=15, type=int)
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
-# env = gym.make(args.env_name)
+
 
 if args.seed:
     torch.manual_seed(args.random_seed)
@@ -73,9 +73,9 @@ action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 state_dim = len(state_space)
 action_dim = len(action_space)
-max_action = float(action_space[...,1])
-min_Val = float(action_space[...,0])
-# min_Val = torch.tensor(1e-7).float().to(device) # min value
+max_action = torch.tensor(1).float().to(device)
+# min_Val = action_space[...,0]
+min_Val = torch.tensor(1e-7).float().to(device) # min value
 
 directory = './carla-' + 'DDPG' +'./'
 
@@ -99,17 +99,17 @@ class Replay_buffer():
 
     def sample(self, batch_size):
         ind = np.random.randint(0, len(self.storage), size=batch_size)
-        x, y, u, r, d = [], [], [], [], []
+        x, y, u, r = [], [], [], []
 
         for i in ind:
-            X, Y, U, R, D = self.storage[i]
+            X, Y, U, R = self.storage[i]
             x.append(np.array(X, copy=False))
             y.append(np.array(Y, copy=False))
             u.append(np.array(U, copy=False))
             r.append(np.array(R, copy=False))
-            d.append(np.array(D, copy=False))
+            
 
-        return np.array(x), np.array(y), np.array(u), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
+        return np.array(x), np.array(y), np.array(u), np.array(r).reshape(-1, 1)
 
 
 class Actor(nn.Module):
@@ -170,16 +170,15 @@ class DDPG(object):
 
         for it in range(args.update_iteration):
             # Sample replay buffer
-            x, y, u, r, d = self.replay_buffer.sample(args.batch_size)
+            x, y, u, r = self.replay_buffer.sample(args.batch_size)
             state = torch.FloatTensor(x).to(device)
             action = torch.FloatTensor(u).to(device)
             next_state = torch.FloatTensor(y).to(device)
-            done = torch.FloatTensor(1-d).to(device)
             reward = torch.FloatTensor(r).to(device)
 
             # Compute the target Q value
             target_Q = self.critic_target(next_state, self.actor_target(next_state))
-            target_Q = reward + (done * args.gamma * target_Q).detach()
+            target_Q = reward + (args.gamma * target_Q).detach()
 
             # Get current Q estimate
             current_Q = self.critic(state, action)
@@ -240,17 +239,20 @@ def main():
             for i in range(args.test_iteration):
                 print('%dth time learning begins'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-                sim_time = 0  # 仿真时间
+                sim_time = 0.5  # 仿真时间
                 start_time = time.time()  # 初始时间
+                
+                state = ego_list[0].get_transform()
+                state = np.array([state.location.x,state.location.y,state.location.z,state.rotation.pitch,state.rotation.yaw,state.rotation.roll])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
 
                 for t in count():
                     action = ego_DDPG.select_action(state)
-                    next_state, reward, done, info = create_envs.get_vehicle_step(np.float32(action))
+                    next_state, reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, action, sim_time)
                     ep_r += reward
-                    if done or t >= args.max_length_of_trajectory:
+                    if next_state[0] > 245 or next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
                         print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
                         ep_r = 0
                         break
@@ -264,29 +266,46 @@ def main():
                 step =0
                 print('%dth time learning begins'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-                sim_time = 0  # 仿真时间
+                sim_time = 0.5  # 仿真时间
                 start_time = time.time()  # 初始时间
 
-                egocol_state = sensor_list[0].get_collision_history()
-                npccol_state = sensor_list[1].get_collision_history()
+                state = ego_list[0].get_transform()
+                state = np.array([state.location.x,state.location.y,state.location.z,state.rotation.pitch,state.rotation.yaw,state.rotation.roll])
+
+                egocol_list = sensor_list[0].get_collision_history()
+                npccol_list = sensor_list[1].get_collision_history()
                 for t in count():
                     action = ego_DDPG.select_action(state)
-                    action = (action + np.random.normal(0, args.exploration_noise, size=action_space)).clip(
-                        max_action, min_Val)
-
-                    next_state = create_envs.get_vehicle_step(ego_list[0],action,t)
+                    action = np.array(action + np.random.normal(0, args.exploration_noise, size=(3,))).clip(
+                        [1,1,1], [0,-1,0])
+                    next_state,reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, action, sim_time)
                     
                     # if args.render and i >= args.render_interval : env.render()
-                    ego_DDPG.replay_buffer.push((state, next_state, action, reward, np.float(done)))
+                    ego_DDPG.replay_buffer.push((state, next_state, action, reward))
 
                     state = next_state
-                    if done:
+                    if next_state[0] > 245 or next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
                         break
                     step += 1
                     total_reward += reward
                 total_step += step+1
                 print("Total T:{} Episode: \t{} Total Reward: \t{:0.2f}".format(total_step, i, total_reward))
                 ego_DDPG.update()
+                time.sleep(0.2)
+
+                for x in sensor_list:
+                    if x.sensor.is_alive:
+                        x.sensor.destroy()            
+                for x in ego_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in npc_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in obstacle_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                print('Reset')
             # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
 
                 if i % args.log_interval == 0:
@@ -295,39 +314,13 @@ def main():
         else:
             raise NameError("mode wrong!!!")
 
-        time.sleep(1)
-            
-        # action
-        while state:  
-            sim_time = time.time() - start_time
-            if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
-                state = state_space[0]
-
-        # print(reward)
-        time.sleep(1)
-
-        for x in sensor_list:
-            if x.sensor.is_alive:
-                x.sensor.destroy()            
-        for x in ego_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in npc_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in obstacle_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-
-        print('Reset')
-
     finally:
-        rew = open('reward.txt','w+')
-        rew.write(str(reward_list))
-        rew.close()
-        x = np.linspace(0,len(reward_list),len(reward_list))
-        plt.plot(x,reward_list)
-        plt.show()
+        # rew = open('reward.txt','w+')
+        # rew.write(str(reward_list))
+        # rew.close()
+        # x = np.linspace(0,len(reward_list),len(reward_list))
+        # plt.plot(x,reward_list)
+        # plt.show()
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:

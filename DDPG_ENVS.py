@@ -91,18 +91,22 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_vehicle_step(self,vehicle,action,sim_time): # 
+    def get_vehicle_step(self,vehicle,sensor,action,sim_time):  
         throttle,brake,steer = action
         vehicle_control = carla.VehicleControl(throttle = throttle, steer = steer, brake = brake)
         vehicle.apply_control(vehicle_control)
         time.sleep(sim_time)
         next_state = vehicle.get_transform()
-        next_state = [next_state.location.x,next_state.location.y,next_state.location.z,
-        next_state.rotation.pitch,next_state.rotation.yaw,next_state.rotation.roll]
-        return next_state 
+        next_state = np.array([next_state.location.x,next_state.location.y,next_state.location.z,
+        next_state.rotation.pitch,next_state.rotation.yaw,next_state.rotation.roll])
+         # 回报设置
+        if vehicle.get_velocity().x > 10:
+            reward = 2
+        reward = sensor[0]*(-100) - 10*(next_state[1] - (-371.640472)) + (245 - next_state[0]) 
+        return [next_state,reward] 
 
     def get_action_space(self):
-        action_space = np.array([[0,1],[-1,1],[0,1]]) # 油门、方向盘、刹车
+        action_space = np.array([[0,1],[-1,1],[0,1]],dtype=np.float16) # 油门、方向盘、刹车
         return action_space
     
     # 车辆状态
