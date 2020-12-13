@@ -113,7 +113,3 @@ class Create_Envs(object):
     def get_state_space(self):
         state_space = [0,0,0,0,0,0] # x,y,z,pitch,yaw,roll
         return state_space
-
-    def get_reward(self,action,sensor_list):  
-        sensor_list
-
