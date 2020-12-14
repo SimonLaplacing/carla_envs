@@ -53,7 +53,7 @@ class Create_Envs(object):
         # spec_transform = ego.get_transform()
         spec_transform = Transform(Location(x=140.341522, y=-375.140472, z=15.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        spec_transform.location += carla.Location(x=60,z=35)
+        spec_transform.location += carla.Location(x=60,z=45)
         spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
         spectator.set_transform(spec_transform)
 
@@ -91,29 +91,38 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_vehicle_step(self,vehicle,sensor,action,sim_time):  
-        move,steer = action
-        # print(move,steer)
-        if move>=0:
-            vehicle_control = carla.VehicleControl(throttle = move, steer = steer, brake = 0)
-        else:
-            vehicle_control = carla.VehicleControl(throttle = 0, steer = steer, brake = move)
-        vehicle.apply_control(vehicle_control)
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_action,npc_action,sim_time):  
+        ego_move,ego_steer = ego_action
+        npc_move,npc_steer = npc_action
+        print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
+        if ego_move >= 0:
+            ego_control = carla.VehicleControl(throttle = ego_move, steer = ego_steer, brake = 0)
+        elif ego_move < 0:
+            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = -1*ego_move)
+        if npc_move >= 0:
+            npc_control = carla.VehicleControl(throttle = npc_move, steer = npc_steer, brake = 0)
+        elif npc_move < 0:
+            npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = -1*npc_move)
+        ego.apply_control(ego_control)
+        npc.apply_control(npc_control)
         time.sleep(sim_time)
-        next_state = vehicle.get_transform()
-        next_state = np.array([next_state.location.x,next_state.location.y,next_state.location.z,
-        next_state.rotation.pitch,next_state.rotation.yaw,next_state.rotation.roll])
+        ego_next_state = ego.get_transform()
+        npc_next_state = npc.get_transform()
+        ego_next_state = np.array([ego_next_state.location.x,ego_next_state.location.y,ego_next_state.location.z,
+        ego_next_state.rotation.pitch,ego_next_state.rotation.yaw,ego_next_state.rotation.roll])
+        npc_next_state = np.array([npc_next_state.location.x,npc_next_state.location.y,npc_next_state.location.z,
+        npc_next_state.rotation.pitch,npc_next_state.rotation.yaw,npc_next_state.rotation.roll])
          # 回报设置
-        if vehicle.get_velocity().x < 10:
-            reward = -1
-        reward += sensor[0]*(-100) - 10*(next_state[1] - (-371.640472)) + (245 - next_state[0]) 
-        return [next_state,reward] 
+        ego_reward = ego_sensor[0]*(-100) - 0.1*(ego_next_state[1] - (-370.640472)) + 0.1*(ego_next_state[0] - 245)
+        npc_reward = npc_sensor[0]*(-100) - 0.05*(npc_next_state[1] - (-374.140472)) + 0.1*(npc_next_state[0] - 245) 
+        return [ego_next_state,ego_reward,npc_next_state,npc_reward]
 
+    # 车辆动作空间
     def get_action_space(self):
         action_space = np.array([[-1,1],[-1,1]],dtype=np.float16) # 油门、方向盘、刹车,油门刹车合并
         return action_space
     
-    # 车辆状态
+    # 车辆状态空间
     def get_state_space(self):
         state_space = [0,0,0,0,0,0] # x,y,z,pitch,yaw,roll
         return state_space
