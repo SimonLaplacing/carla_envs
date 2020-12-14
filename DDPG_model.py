@@ -33,29 +33,23 @@ import carla
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-# OpenAI gym environment name, # ['BipedalWalker-v2', 'Pendulum-v0'] or any continuous environment
-# Note that DDPG is feasible about hyper-parameters.
-# You should fine-tuning if you change to another environment.
-# parser.add_argument("--env_name", default="Pendulum-v0")
 parser.add_argument('--tau',  default=0.005, type=float) # target smoothing coefficient
 parser.add_argument('--target_update_interval', default=1, type=int)
 parser.add_argument('--test_iteration', default=10, type=int)
-parser.add_argument('--max_length_of_trajectory', default=5, type=int)
+parser.add_argument('--max_length_of_trajectory', default=1000, type=int) # 仿真步长
 parser.add_argument('--learning_rate', default=1e-4, type=float)
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=1000000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=100, type=int) # mini batch size
+parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=60, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool)
-parser.add_argument('--random_seed', default=9527, type=int)
+parser.add_argument('--random_seed', default=1227, type=int)
 # optional parameters
 
 parser.add_argument('--sample_frequency', default=2000, type=int)
-# parser.add_argument('--render', default=False, type=bool) # show UI or not
 parser.add_argument('--log_interval', default=50, type=int) #
 parser.add_argument('--load', default=False, type=bool) # load model
-# parser.add_argument('--render_interval', default=100, type=int) # after render_interval, the env.render() will work
 parser.add_argument('--exploration_noise', default=0.1, type=float)
-parser.add_argument('--max_episode', default=100, type=int) # num of games
+parser.add_argument('--max_episode', default=1000, type=int) # num of games
 parser.add_argument('--print_log', default=5, type=int)
 parser.add_argument('--update_iteration', default=15, type=int)
 args = parser.parse_args()
@@ -73,9 +67,8 @@ action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 state_dim = len(state_space)
 action_dim = len(action_space)
-max_action = torch.tensor(1).float().to(device)
-# min_Val = action_space[...,0]
-min_Val = torch.tensor(1e-7).float().to(device) # min value
+max_action = torch.tensor(action_space[...,1]).float().to(device)
+min_action = torch.tensor(action_space[...,0]).float().to(device) # min value
 
 directory = './carla-' + 'DDPG' +'./'
 
@@ -116,9 +109,9 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        self.l1 = nn.Linear(state_dim, 30)
+        self.l2 = nn.Linear(30, 10)
+        self.l3 = nn.Linear(10, action_dim)
 
         self.max_action = max_action
 
@@ -133,9 +126,9 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400 , 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, 40)
+        self.l2 = nn.Linear(40 , 20)
+        self.l3 = nn.Linear(20, 1)
 
     def forward(self, x, u):
         x = F.relu(self.l1(torch.cat([x, u], 1)))
@@ -239,7 +232,7 @@ def main():
             for i in range(args.test_iteration):
                 print('%dth time learning begins'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-                sim_time = 0.5  # 仿真时间
+                sim_time = 0.5  # 每步仿真时间
                 start_time = time.time()  # 初始时间
                 
                 state = ego_list[0].get_transform()
@@ -250,7 +243,7 @@ def main():
 
                 for t in count():
                     action = ego_DDPG.select_action(state)
-                    next_state, reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, action, sim_time)
+                    next_state, reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, action.cpu().numpy(), sim_time)
                     ep_r += reward
                     if next_state[0] > 245 or next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
                         print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
@@ -260,6 +253,7 @@ def main():
 
         elif args.mode == 'train':
             if args.load: ego_DDPG.load()
+            if args.load: npc_DDPG.load()
             total_step = 0
             for i in range(args.max_episode):
                 total_reward = 0
@@ -269,22 +263,27 @@ def main():
                 sim_time = 0.5  # 仿真时间
                 start_time = time.time()  # 初始时间
 
-                state = ego_list[0].get_transform()
-                state = np.array([state.location.x,state.location.y,state.location.z,state.rotation.pitch,state.rotation.yaw,state.rotation.roll])
+                ego_state = ego_list[0].get_transform()
+                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.location.z,ego_state.rotation.pitch,ego_state.rotation.yaw,ego_state.rotation.roll])
+                npc_state = npc_list[0].get_transform()
+                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.location.z,npc_state.rotation.pitch,npc_state.rotation.yaw,npc_state.rotation.roll])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 for t in count():
-                    action = ego_DDPG.select_action(state)
-                    action = np.array(action + np.random.normal(0, args.exploration_noise, size=(3,))).clip(
-                        [1,1,1], [0,-1,0])
-                    next_state,reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, action, sim_time)
-                    
-                    # if args.render and i >= args.render_interval : env.render()
-                    ego_DDPG.replay_buffer.push((state, next_state, action, reward))
-
-                    state = next_state
-                    if next_state[0] > 245 or next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
+                    ego_action = ego_DDPG.select_action(state)
+                    npc_action = npc_DDPG.select_action(state)
+                    ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
+                        min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
+                        min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    ego_next_state,ego_reward = create_envs.get_vehicle_step(ego_list[0], egocol_list, ego_action, sim_time)
+                    npc_next_state,npc_reward = create_envs.get_vehicle_step(npc_list[0], npccol_list, npc_action, sim_time)
+                    ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward))
+                    npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward))
+                    ego_state = ego_next_state
+                    npc_state = npc_next_state
+                    if ego_next_state[0] > 245 or ego_next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
                         break
                     step += 1
                     total_reward += reward
