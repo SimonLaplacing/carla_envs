@@ -62,6 +62,8 @@ class Create_Envs(object):
         for i in range(1):
             npc_transform.location += carla.Location(x=-15,y=-3.5)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+            # print(npc_bp.get_attribute('color').recommended_values)
+            npc_bp.set_attribute('color', '229,28,0')
             npc = world.try_spawn_actor(npc_bp, npc_transform)
             if npc is None:
                 print('%s npc created failed' % i)
@@ -96,13 +98,13 @@ class Create_Envs(object):
         npc_move,npc_steer = npc_action
         print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
         if ego_move >= 0:
-            ego_control = carla.VehicleControl(throttle = ego_move, steer = ego_steer, brake = 0)
+            ego_control = carla.VehicleControl(throttle = ego_move, steer = 0, brake = 0)
         elif ego_move < 0:
-            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = -1*ego_move)
+            ego_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -ego_move)
         if npc_move >= 0:
-            npc_control = carla.VehicleControl(throttle = npc_move, steer = npc_steer, brake = 0)
+            npc_control = carla.VehicleControl(throttle = npc_move, steer = 0, brake = 0)
         elif npc_move < 0:
-            npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = -1*npc_move)
+            npc_control = carla.VehicleControl(throttle = -npc_move, steer = 0, brake = 0)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
         time.sleep(sim_time)
@@ -113,8 +115,8 @@ class Create_Envs(object):
         npc_next_state = np.array([npc_next_state.location.x,npc_next_state.location.y,npc_next_state.location.z,
         npc_next_state.rotation.pitch,npc_next_state.rotation.yaw,npc_next_state.rotation.roll])
          # 回报设置
-        ego_reward = ego_sensor[0]*(-100) - 0.1*(ego_next_state[1] - (-370.640472)) + 0.1*(ego_next_state[0] - 245)
-        npc_reward = npc_sensor[0]*(-100) - 0.05*(npc_next_state[1] - (-374.140472)) + 0.1*(npc_next_state[0] - 245) 
+        ego_reward = ego_sensor[0]*(-100) - 0.1*(ego_next_state[1] - (-370.640472)) + 0.2*(ego_next_state[0] - 245)
+        npc_reward = npc_sensor[0]*(-100) - 0.05*abs(npc_next_state[1] - (-375.140472)) + 0.2*(npc_next_state[0] - 245) 
         return [ego_next_state,ego_reward,npc_next_state,npc_reward]
 
     # 车辆动作空间

@@ -37,10 +37,10 @@ parser.add_argument('--tau',  default=0.005, type=float) # target smoothing coef
 parser.add_argument('--target_update_interval', default=1, type=int)
 parser.add_argument('--test_iteration', default=10, type=int)
 parser.add_argument('--max_length_of_trajectory', default=60, type=int) # 仿真步长
-parser.add_argument('--learning_rate', default=1e-4, type=float)
+parser.add_argument('--learning_rate', default=1e-3, type=float)
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=60, type=int) # mini batch size
+parser.add_argument('--batch_size', default=40, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool)
 parser.add_argument('--random_seed', default=1227, type=int)
 # optional parameters
@@ -48,10 +48,10 @@ parser.add_argument('--random_seed', default=1227, type=int)
 parser.add_argument('--sample_frequency', default=2000, type=int)
 parser.add_argument('--log_interval', default=50, type=int) #
 parser.add_argument('--load', default=False, type=bool) # load model
-parser.add_argument('--exploration_noise', default=0.05, type=float)
+parser.add_argument('--exploration_noise', default=0.5, type=float)
 parser.add_argument('--max_episode', default=2000, type=int) # num of games
 parser.add_argument('--print_log', default=5, type=int)
-parser.add_argument('--update_iteration', default=15, type=int)
+parser.add_argument('--update_iteration', default=8, type=int)
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -108,11 +108,11 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 30)
+        self.l1 = nn.Linear(state_dim, 50)
         self.l1.weight.data.normal_(0,0.1)
-        self.l2 = nn.Linear(30, 10)
+        self.l2 = nn.Linear(50, 20)
         self.l2.weight.data.normal_(0,0.1)
-        self.l3 = nn.Linear(10, action_dim)
+        self.l3 = nn.Linear(20, action_dim)
         self.l3.weight.data.normal_(0,0.1)
         self.max_action = max_action
 
@@ -127,9 +127,9 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, 40)
+        self.l1 = nn.Linear(state_dim + action_dim, 50)
         self.l1.weight.data.normal_(0,0.1)
-        self.l2 = nn.Linear(40 , 20)
+        self.l2 = nn.Linear(50 , 20)
         self.l2.weight.data.normal_(0,0.1)
         self.l3 = nn.Linear(20, 1)
         self.l3.weight.data.normal_(0,0.1)
@@ -252,10 +252,19 @@ def main():
                     npc_action = npc_DDPG.select_action(npc_state)
                     ego_next_state,ego_reward,npc_next_state,npc_reward = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
                     ep_r += ego_reward
-                    if ego_next_state[0] > 245 or ego_next_state[1] > -367 or t >= args.max_length_of_trajectory: # 结束条件
+                    if t >= args.max_length_of_trajectory: # 总结束条件
                         print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
                         ep_r = 0
                         break
+                    if egocol_list[0]==1 or ego_next_state[0] > 245 or ego_next_state[1] > -367: # ego结束条件
+                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
+                        ep_r = 0
+                        break
+                    if npccol_list[0]==1 or npc_next_state[0] > 245 or npc_next_state[1] > -370: # npc结束条件
+                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
+                        ep_r = 0
+                        break
+                    period = time.time() - start_time                    
                     ego_state = ego_next_state
 
         elif args.mode == 'train':
@@ -286,6 +295,7 @@ def main():
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     ego_next_state,ego_reward,npc_next_state,npc_reward = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
+                    
                     ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward))
                     npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward))
                     ego_state = ego_next_state
@@ -303,16 +313,17 @@ def main():
                         break
                     period = time.time() - start_time
                     # print('period:',period)
-                ego_total_reward -= 0.3*step
-                npc_total_reward -= 0.3*step
+                ego_total_reward /= step
+                npc_total_reward /= step
                 total_step += step+1
-                print("Total T: {} Episode: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(total_step, i, ego_total_reward, npc_total_reward))
+                print("T: {} Episode: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(step, i, ego_total_reward, npc_total_reward))
                 ego_DDPG.update()
                 npc_DDPG.update()
                 # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
                 if i % args.log_interval == 0:
                     ego_DDPG.save()
                     npc_DDPG.save()
+
                 for x in sensor_list:
                     if x.sensor.is_alive:
                         x.sensor.destroy()            
