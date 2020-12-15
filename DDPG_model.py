@@ -37,7 +37,7 @@ parser.add_argument('--tau',  default=0.005, type=float) # target smoothing coef
 parser.add_argument('--target_update_interval', default=1, type=int)
 parser.add_argument('--test_iteration', default=10, type=int)
 parser.add_argument('--max_length_of_trajectory', default=60, type=int) # 仿真步长
-parser.add_argument('--learning_rate', default=1e-4, type=float)
+parser.add_argument('--learning_rate', default=1e-3, type=float)
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=60, type=int) # mini batch size
