@@ -39,14 +39,14 @@ parser.add_argument('--test_iteration', default=10, type=int)
 parser.add_argument('--max_length_of_trajectory', default=60, type=int) # 仿真步长
 parser.add_argument('--learning_rate', default=1e-3, type=float)
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=40, type=int) # mini batch size
+parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=80, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool)
 parser.add_argument('--random_seed', default=1227, type=int)
 # optional parameters
 
 parser.add_argument('--sample_frequency', default=2000, type=int)
-parser.add_argument('--log_interval', default=50, type=int) #
+parser.add_argument('--log_interval', default=50, type=int) 
 parser.add_argument('--load', default=False, type=bool) # load model
 parser.add_argument('--exploration_noise', default=0.5, type=float)
 parser.add_argument('--max_episode', default=2000, type=int) # num of games
@@ -207,12 +207,14 @@ class DDPG(object):
             self.num_actor_update_iteration += 1
             self.num_critic_update_iteration += 1
 
+            print('-----model updated-----')
+
     def save(self):
         torch.save(self.actor.state_dict(), directory + 'actor.pth')
         torch.save(self.critic.state_dict(), directory + 'critic.pth')
-        # print("====================================")
-        # print("Model has been saved...")
-        # print("====================================")
+        print("====================================")
+        print("Model has been saved...")
+        print("====================================")
 
     def load(self):
         self.actor.load_state_dict(torch.load(directory + 'actor.pth'))
@@ -341,12 +343,6 @@ def main():
             raise NameError("mode wrong!!!")
 
     finally:
-        # rew = open('reward.txt','w+')
-        # rew.write(str(reward_list))
-        # rew.close()
-        # x = np.linspace(0,len(reward_list),len(reward_list))
-        # plt.plot(x,reward_list)
-        # plt.show()
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
