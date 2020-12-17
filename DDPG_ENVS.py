@@ -116,8 +116,17 @@ class Create_Envs(object):
         npc_next_state.rotation.pitch,npc_next_state.rotation.yaw,npc_next_state.rotation.roll])
          # 回报设置
         ego_reward = ego_sensor[0]*(-200) - (ego_next_state[1] - (-370.640472))/370 + (ego_next_state[0] - 245)/245
-        npc_reward = npc_sensor[0]*(-200) - abs(npc_next_state[1] - (-375.140472))/375 + (npc_next_state[0] - 245)/245  
-        return [ego_next_state,ego_reward,npc_next_state,npc_reward]
+        npc_reward = npc_sensor[0]*(-200) - abs(npc_next_state[1] - (-375.140472))/375 + (npc_next_state[0] - 245)/245
+        # done结束状态判断
+        if ego_sensor[0]==1 or ego_next_state[0] > 245 or ego_next_state[1] > -367: # ego结束条件ego_done
+            ego_done = True
+        else:
+            ego_done = False
+        if npc_sensor[0]==1 or npc_next_state[0] > 245 or npc_next_state[1] > -370: # npc结束条件npc_done
+            npc_done = True
+        else:
+            npc_done = False  
+        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done]
 
     # 车辆动作空间
     def get_action_space(self):
