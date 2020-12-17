@@ -46,8 +46,8 @@ parser.add_argument('--random_seed', default=1227, type=int)
 # optional parameters
 
 parser.add_argument('--sample_frequency', default=2000, type=int)
-parser.add_argument('--log_interval', default=50, type=int) 
-parser.add_argument('--load', default=False, type=bool) # load model
+parser.add_argument('--log_interval', default=50, type=int) #
+parser.add_argument('--load', default=True, type=bool) # load model
 parser.add_argument('--exploration_noise', default=0.5, type=float)
 parser.add_argument('--max_episode', default=2000, type=int) # num of games
 parser.add_argument('--print_log', default=5, type=int)
@@ -108,11 +108,11 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 50)
+        self.l1 = nn.Linear(state_dim, 400)
         self.l1.weight.data.normal_(0,0.1)
-        self.l2 = nn.Linear(50, 20)
+        self.l2 = nn.Linear(400, 200)
         self.l2.weight.data.normal_(0,0.1)
-        self.l3 = nn.Linear(20, action_dim)
+        self.l3 = nn.Linear(200, action_dim)
         self.l3.weight.data.normal_(0,0.1)
         self.max_action = max_action
 
@@ -127,11 +127,11 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, 50)
+        self.l1 = nn.Linear(state_dim + action_dim, 500)
         self.l1.weight.data.normal_(0,0.1)
-        self.l2 = nn.Linear(50 , 20)
+        self.l2 = nn.Linear(500 , 300)
         self.l2.weight.data.normal_(0,0.1)
-        self.l3 = nn.Linear(20, 1)
+        self.l3 = nn.Linear(300, 1)
         self.l3.weight.data.normal_(0,0.1)
 
     def forward(self, x, u):
