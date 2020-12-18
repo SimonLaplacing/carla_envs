@@ -33,11 +33,13 @@ import carla
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--tau',  default=0.01, type=float) # 目标网络学习率/更新率
+parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--target_update_interval', default=2, type=int) # 目标网络更新间隔
+parser.add_argument('--warmup_step', default=10, type=int) # 网络更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 仿真步长
-parser.add_argument('--learning_rate', default=1e-4, type=float) # 学习率
+parser.add_argument('--Alearning_rate', default=1e-4, type=float) # 学习率
+parser.add_argument('--Clearning_rate', default=1e-3, type=float) # 学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
@@ -157,12 +159,12 @@ class DDPG(object):
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_target = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=args.learning_rate)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=args.Alearning_rate)
 
         self.critic = Critic(state_dim, action_dim).to(device)
         self.critic_target = Critic(state_dim, action_dim).to(device)
         self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=args.learning_rate)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=args.Clearning_rate)
         self.replay_buffer = Replay_buffer()
         self.writer = SummaryWriter(directory)
 
@@ -174,54 +176,52 @@ class DDPG(object):
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         return self.actor(state).cpu().data.numpy().flatten()
 
-    def update(self):
+    def update(self,curr_epi):
 
-        for it in range(args.update_iteration):
-            # Sample replay buffer
-            x, y, u, r, d = self.replay_buffer.sample(args.batch_size)
-            state = torch.FloatTensor(x).to(device)
-            action = torch.FloatTensor(u).to(device)
-            next_state = torch.FloatTensor(y).to(device)
-            done = torch.FloatTensor(1-d).to(device)
-            reward = torch.FloatTensor(r).to(device)
+        if curr_epi > args.warmup_step:
+            for it in range(args.update_iteration):
+                # Sample replay buffer
+                x, y, u, r, d = self.replay_buffer.sample(args.batch_size)
+                state = torch.FloatTensor(x).to(device)
+                action = torch.FloatTensor(u).to(device)
+                next_state = torch.FloatTensor(y).to(device)
+                done = torch.FloatTensor(1-d).to(device)
+                reward = torch.FloatTensor(r).to(device)
 
-            # Compute the target Q value
-            target_Q = self.critic_target(next_state, self.actor_target(next_state))
-            # target_Q = reward + (args.gamma * target_Q).detach()
-            target_Q = reward + (done * args.gamma * target_Q).detach()
+                # Compute the target Q value
+                target_Q = self.critic_target(next_state, self.actor_target(next_state))
+                target_Q = reward + (done * args.gamma * target_Q).detach()
 
-            # Get current Q estimate
-            current_Q = self.critic(state, action)
+                # Get current Q estimate
+                current_Q = self.critic(state, action)
 
-            # Compute critic loss
-            critic_loss = F.mse_loss(current_Q, target_Q)
-            self.writer.add_scalar('Loss/critic_loss', critic_loss, global_step=self.num_critic_update_iteration)
-            # Optimize the critic
-            self.critic_optimizer.zero_grad()
-            critic_loss.backward()
-            self.critic_optimizer.step()
+                # Compute critic loss
+                critic_loss = F.mse_loss(current_Q, target_Q)
+                self.writer.add_scalar('Loss/critic_loss', critic_loss, global_step=self.num_critic_update_iteration)
+                # Optimize the critic
+                self.critic_optimizer.zero_grad()
+                critic_loss.backward()
+                self.critic_optimizer.step()
 
-            # Compute actor loss
-            actor_loss = -self.critic(state, self.actor(state)).mean()
-            self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
+                # Compute actor loss
+                actor_loss = -self.critic(state, self.actor(state)).mean()
+                self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
 
-            # Optimize the actor
-            self.actor_optimizer.zero_grad()
-            actor_loss.backward()
-            self.actor_optimizer.step()
+                # Optimize the actor
+                self.actor_optimizer.zero_grad()
+                actor_loss.backward()
+                self.actor_optimizer.step()
 
-            # Update the frozen target models
-            if it % args.target_update_interval == 0:
-                for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-                    target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+                # Update the frozen target models
+                if it % args.target_update_interval == 0:
+                    for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+                        target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
 
-                for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-                    target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+                    for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+                        target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
 
-            self.num_actor_update_iteration += 1
-            self.num_critic_update_iteration += 1
-
-            # print('-----model updated-----')
+                self.num_actor_update_iteration += 1
+                self.num_critic_update_iteration += 1
 
     def save(self):
         torch.save(self.actor.state_dict(), directory + 'actor.pth')
@@ -356,11 +356,11 @@ def main():
                         break
                     # period = time.time() - start_time
                     # print('period:',period)
-                ego_total_reward /= step
-                npc_total_reward /= step
-                print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
-                ego_DDPG.update()
-                npc_DDPG.update()
+                ego_total_reward /= t
+                npc_total_reward /= t
+                print("Episode: {} step: {} ego_Total_Reward: {:0.2f} npc_Total_Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
+                ego_DDPG.update(curr_epi=i)
+                npc_DDPG.update(curr_epi=i)
                 # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
                 if i % args.log_interval == 0:
                     ego_DDPG.save()
