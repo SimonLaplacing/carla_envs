@@ -36,30 +36,43 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络学习率/更新率
 parser.add_argument('--target_update_interval', default=2, type=int) # 目标网络更新间隔
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=60, type=int) # 仿真步长
-parser.add_argument('--learning_rate', default=1e-3, type=float) # 学习率
+parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 仿真步长
+parser.add_argument('--learning_rate', default=1e-4, type=float) # 学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=80, type=int) # mini batch size
+parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
+parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
+
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # load model
-parser.add_argument('--exploration_noise', default=0.9, type=float) # 探索噪音 
-parser.add_argument('--max_episode', default=2000, type=int) # num of games
-parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
+parser.add_argument('--exploration_noise', default=0.2, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=1000, type=int) # num of games
+parser.add_argument('--update_iteration', default = 50, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
 
-
+# 随机值
 if args.seed:
     torch.manual_seed(args.random_seed)
     np.random.seed(args.random_seed)
 
-create_envs = DDPG_ENVS.Create_Envs()
+# 环境建立
+if args.mode == 'train':
+    create_envs = DDPG_ENVS.Create_Envs(args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
+    print('training mode is activated')
+elif args.mode == 'test':
+    create_envs = DDPG_ENVS.Create_Envs()
+    print('testing mode is activated')
+else:
+    raise NameError("mode wrong!!!")
+
+# 状态、动作空间定义
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 state_dim = len(state_space)
@@ -107,11 +120,11 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
 
         self.l1 = nn.Linear(state_dim, 400)
-        self.l1.weight.data.normal_(0,0.1)
+        self.l1.weight.data.normal_(1,1)
         self.l2 = nn.Linear(400, 200)
-        self.l2.weight.data.normal_(0,0.1)
+        self.l2.weight.data.normal_(1,1)
         self.l3 = nn.Linear(200, action_dim)
-        self.l3.weight.data.normal_(0,0.1)
+        self.l3.weight.data.normal_(1,1)
         self.max_action = max_action
 
     def forward(self, x):
@@ -126,11 +139,11 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.l1 = nn.Linear(state_dim + action_dim, 500)
-        self.l1.weight.data.normal_(0,0.1)
+        self.l1.weight.data.normal_(1,1)
         self.l2 = nn.Linear(500 , 300)
-        self.l2.weight.data.normal_(0,0.1)
+        self.l2.weight.data.normal_(1,1)
         self.l3 = nn.Linear(300, 1)
-        self.l3.weight.data.normal_(0,0.1)
+        self.l3.weight.data.normal_(1,1)
 
     def forward(self, x, u):
         x = F.relu(self.l1(torch.cat([x, u], 1)))
@@ -227,9 +240,8 @@ class DDPG(object):
 def main():
     ego_DDPG = DDPG(state_dim, action_dim, max_action)
     npc_DDPG = DDPG(state_dim, action_dim, max_action)
-    ep_r = 0
+    sim_time = args.fixed_delta_seconds  # 每步仿真时间
     client, world, blueprint_library = create_envs.connection()
-    print("Collecting Experience....")
     reward_list = []
 
     try:
@@ -237,9 +249,10 @@ def main():
             ego_DDPG.load()
             ego_DDPG.load()
             for i in range(args.test_iteration):
-                print('%dth time learning begins'%i)
+                ego_total_reward = 0
+                npc_total_reward = 0
+                print('---------%dth time learning begins---------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-                sim_time = 0.5  # 每步仿真时间
                 start_time = time.time()  # 初始时间
                 
                 ego_state = ego_list[0].get_transform()
@@ -253,36 +266,54 @@ def main():
                 for t in count():
                     ego_action = ego_DDPG.select_action(ego_state)
                     npc_action = npc_DDPG.select_action(npc_state)
+
+                    ego_action = np.array(ego_action + np.random.normal(0, 0, size=(action_dim,))).clip(
+                        min_action.cpu().numpy(), max_action.cpu().numpy())
+                    npc_action = np.array(npc_action + np.random.normal(0, 0, size=(action_dim,))).clip(
+                        min_action.cpu().numpy(), max_action.cpu().numpy())
                     # ego_next_state,ego_reward,npc_next_state,npc_reward = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
-                    ep_r += ego_reward
+                    
+                    ego_total_reward += ego_reward
+                    npc_total_reward += npc_reward
+
                     if t >= args.max_length_of_trajectory: # 总结束条件
-                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
-                        ep_r = 0
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
                         break
                     if ego_done: # ego结束条件ego_done
-                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
-                        ep_r = 0
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
                         break
                     if npc_done: # npc结束条件npc_done
-                        print("Ep_i \t{}, the ep_r is \t{:0.2f}, the step is \t{}".format(i, ep_r, t))
-                        ep_r = 0
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
                         break
                     period = time.time() - start_time                    
                     ego_state = ego_next_state
+                    npc_state = npc_next_state
+                
+                for x in sensor_list:
+                    if x.sensor.is_alive:
+                        x.sensor.destroy()            
+                for x in ego_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in npc_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in obstacle_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                print('Reset')
 
         elif args.mode == 'train':
             if args.load: ego_DDPG.load()
             if args.load: npc_DDPG.load()
-            total_step = 0
             for i in range(args.max_episode):
                 ego_total_reward = 0
                 npc_total_reward = 0
                 step =0
-                print('%dth time learning begins'%i)
+                print('------------%dth time learning begins-----------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-                sim_time = 0.5  # 仿真时间,同步render模式下carla跟着实际仿真指定时间，非同步render模式下模拟仿真指定时间
-                # start_time = time.time()  # 开始时间
+                start_time = time.time()  # 开始时间
 
                 ego_state = ego_list[0].get_transform()
                 ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.location.z,ego_state.rotation.pitch,ego_state.rotation.yaw,ego_state.rotation.roll])
@@ -306,17 +337,14 @@ def main():
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    # ego_next_state,ego_reward,npc_next_state,npc_reward = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
+
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
 
-                    # ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward))
-                    # npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward))
                     ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward, ego_done))
                     npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward, npc_done))
                     ego_state = ego_next_state
                     npc_state = npc_next_state
                     
-                    step += 1
                     ego_total_reward += ego_reward
                     npc_total_reward += npc_reward
 
@@ -330,8 +358,7 @@ def main():
                     # print('period:',period)
                 ego_total_reward /= step
                 npc_total_reward /= step
-                total_step += step+1
-                print("T: {} Episode: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(step, i, ego_total_reward, npc_total_reward))
+                print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update()
                 npc_DDPG.update()
                 # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
@@ -352,8 +379,6 @@ def main():
                     if x.is_alive:
                         client.apply_batch([carla.command.DestroyActor(x)])
                 print('Reset')
-        else:
-            raise NameError("mode wrong!!!")
 
     finally:
         # 清洗环境
