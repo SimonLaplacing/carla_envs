@@ -106,13 +106,13 @@ class Create_Envs(object):
         npc_move,npc_steer = npc_action
         print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
         if ego_move >= 0:
-            ego_control = carla.VehicleControl(throttle = ego_move, steer = ego_steer, brake = 0)
+            ego_control = carla.VehicleControl(throttle = ego_move, steer = 0, brake = 0)
         elif ego_move < 0:
-            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = -ego_move)
+            ego_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -ego_move)
         if npc_move >= 0:
             npc_control = carla.VehicleControl(throttle = npc_move, steer = 0, brake = 0)
         elif npc_move < 0:
-            npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -npc_move)
+            npc_control = carla.VehicleControl(throttle = -npc_move, steer = 0, brake = 0)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
         if not self.no_rendering_mode:

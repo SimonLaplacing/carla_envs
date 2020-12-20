@@ -35,18 +35,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--target_update_interval', default=2, type=int) # 目标网络更新间隔
-parser.add_argument('--warmup_step', default=10, type=int) # 网络更新预备回合数
+parser.add_argument('--warmup_step', default=20, type=int) # 网络更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 仿真步长
-parser.add_argument('--Alearning_rate', default=1e-4, type=float) # 学习率
-parser.add_argument('--Clearning_rate', default=1e-3, type=float) # 学习率
+parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
+parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
@@ -67,10 +67,10 @@ if args.seed:
 # 环境建立
 if args.mode == 'train':
     create_envs = DDPG_ENVS.Create_Envs(args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
-    print('training mode is activated')
+    print('==========training mode is activated==========')
 elif args.mode == 'test':
     create_envs = DDPG_ENVS.Create_Envs()
-    print('testing mode is activated')
+    print('===========testing mode is activated===========')
 else:
     raise NameError("mode wrong!!!")
 
@@ -121,12 +121,12 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l1.weight.data.normal_(1,1)
-        self.l2 = nn.Linear(400, 200)
-        self.l2.weight.data.normal_(1,1)
-        self.l3 = nn.Linear(200, action_dim)
-        self.l3.weight.data.normal_(1,1)
+        self.l1 = nn.Linear(state_dim, 300)
+        # self.l1.weight.data.normal_(1,1)
+        self.l2 = nn.Linear(300, 100)
+        # self.l2.weight.data.normal_(1,1)
+        self.l3 = nn.Linear(100, action_dim)
+        # self.l3.weight.data.normal_(1,1)
         self.max_action = max_action
 
     def forward(self, x):
@@ -140,12 +140,12 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, 500)
-        self.l1.weight.data.normal_(1,1)
-        self.l2 = nn.Linear(500 , 300)
-        self.l2.weight.data.normal_(1,1)
-        self.l3 = nn.Linear(300, 1)
-        self.l3.weight.data.normal_(1,1)
+        self.l1 = nn.Linear(state_dim + action_dim, 300)
+        # self.l1.weight.data.normal_(1,1)
+        self.l2 = nn.Linear(300 , 100)
+        # self.l2.weight.data.normal_(1,1)
+        self.l3 = nn.Linear(100, 1)
+        # self.l3.weight.data.normal_(1,1)
 
     def forward(self, x, u):
         x = F.relu(self.l1(torch.cat([x, u], 1)))
