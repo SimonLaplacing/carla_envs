@@ -101,31 +101,29 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_action,npc_action,sim_time=0.5):  
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_action,npc_action,sim_time=0.05):  
         ego_move,ego_steer = ego_action
         npc_move,npc_steer = npc_action
         print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
         if ego_move >= 0:
-            ego_control = carla.VehicleControl(throttle = ego_move, steer = 0, brake = 0)
+            ego_control = carla.VehicleControl(throttle = ego_move, steer = ego_steer, brake = 0)
         elif ego_move < 0:
-            ego_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -ego_move)
+            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = -ego_move)
         if npc_move >= 0:
             npc_control = carla.VehicleControl(throttle = npc_move, steer = 0, brake = 0)
         elif npc_move < 0:
-            npc_control = carla.VehicleControl(throttle = -npc_move, steer = 0, brake = 0)
+            npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -npc_move)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
         if not self.no_rendering_mode:
             time.sleep(sim_time)
         ego_next_state = ego.get_transform()
         npc_next_state = npc.get_transform()
-        ego_next_state = np.array([ego_next_state.location.x,ego_next_state.location.y,ego_next_state.location.z,
-        ego_next_state.rotation.pitch,ego_next_state.rotation.yaw,ego_next_state.rotation.roll])
-        npc_next_state = np.array([npc_next_state.location.x,npc_next_state.location.y,npc_next_state.location.z,
-        npc_next_state.rotation.pitch,npc_next_state.rotation.yaw,npc_next_state.rotation.roll])
-         # 回报设置
-        ego_reward = ego_sensor[0]*(-200) - 2*(ego_next_state[1] - (-370.640472))/370 + (ego_next_state[0] - 245)/245
-        npc_reward = npc_sensor[0]*(-200) - 2*abs(npc_next_state[1] - (-375.140472))/375 + (npc_next_state[0] - 245)/245
+        ego_next_state = np.array([ego_next_state.location.x,ego_next_state.location.y,ego_next_state.rotation.yaw])
+        npc_next_state = np.array([npc_next_state.location.x,npc_next_state.location.y,npc_next_state.rotation.yaw])
+         # 回报设置:碰撞惩罚、横向惩罚、纵向奖励
+        ego_reward = ego_sensor[0]*(-100) - 2*(ego_next_state[1] - (-370.640472))/370 + (ego_next_state[0] - 245)/245
+        npc_reward = npc_sensor[0]*(-100) - 2*abs(npc_next_state[1] - (-375.140472))/375 + (npc_next_state[0] - 245)/245
         # done结束状态判断
         if ego_sensor[0]==1 or ego_next_state[0] > 245 or ego_next_state[1] > -367: # ego结束条件ego_done
             ego_done = True
@@ -144,5 +142,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0] # x,y,z,pitch,yaw,roll
+        state_space = [0,0,0] # x,y,yaw
         return state_space

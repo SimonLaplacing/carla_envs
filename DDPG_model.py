@@ -35,25 +35,25 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--target_update_interval', default=2, type=int) # 目标网络更新间隔
-parser.add_argument('--warmup_step', default=20, type=int) # 网络更新预备回合数
+parser.add_argument('--warmup_step', default=10, type=int) # 网络更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 仿真步长
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=100, type=int) # mini batch size
+parser.add_argument('--batch_size', default=50, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # load model
-parser.add_argument('--exploration_noise', default=0.2, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1000, type=int) # num of games
-parser.add_argument('--update_iteration', default = 50, type=int) # 网络迭代次数
+parser.add_argument('--exploration_noise', default=0.1, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=500, type=int) # num of games
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -80,16 +80,12 @@ state_space = create_envs.get_state_space()
 state_dim = len(state_space)
 action_dim = len(action_space)
 max_action = torch.tensor(action_space[...,1]).float().to(device)
-min_action = torch.tensor(action_space[...,0]).float().to(device) # min value
+min_action = torch.tensor(action_space[...,0]).float().to(device)
 
 directory = './carla-' + 'DDPG' +'./'
 
 class Replay_buffer():
-    '''
-    Code based on:
-    https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
-    Expects tuples of (state, next_state, action, reward, done)
-    '''
+
     def __init__(self, max_size=args.capacity):
         self.storage = []
         self.max_size = max_size
@@ -247,7 +243,7 @@ def main():
     try:
         if args.mode == 'test':
             ego_DDPG.load()
-            ego_DDPG.load()
+            npc_DDPG.load()
             for i in range(args.test_iteration):
                 ego_total_reward = 0
                 npc_total_reward = 0
@@ -256,9 +252,9 @@ def main():
                 start_time = time.time()  # 初始时间
                 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.location.z,ego_state.rotation.pitch,ego_state.rotation.yaw,ego_state.rotation.roll])
+                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.rotation.yaw])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.location.z,npc_state.rotation.pitch,npc_state.rotation.yaw,npc_state.rotation.roll])
+                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.rotation.yaw])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
@@ -271,7 +267,6 @@ def main():
                         min_action.cpu().numpy(), max_action.cpu().numpy())
                     npc_action = np.array(npc_action + np.random.normal(0, 0, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy())
-                    # ego_next_state,ego_reward,npc_next_state,npc_reward = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
                     
                     ego_total_reward += ego_reward
@@ -316,23 +311,20 @@ def main():
                 start_time = time.time()  # 开始时间
 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.location.z,ego_state.rotation.pitch,ego_state.rotation.yaw,ego_state.rotation.roll])
+                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.rotation.yaw])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.location.z,npc_state.rotation.pitch,npc_state.rotation.yaw,npc_state.rotation.roll])
-
+                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.rotation.yaw])
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 for t in count():
                     ego_action = ego_DDPG.select_action(ego_state)
                     npc_action = npc_DDPG.select_action(npc_state)
-                    if i<=500:
+                    if i<=args.max_episode/3:
                         noise = args.exploration_noise
-                    elif i<=700:
+                    elif i<=args.max_episode/2:
                         noise = args.exploration_noise/2
-                    elif i<=1000:
-                        noise = args.exploration_noise/3
                     else:
-                        noise = args.exploration_noise/5
+                        noise = args.exploration_noise/3
                     ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
@@ -358,6 +350,7 @@ def main():
                     # print('period:',period)
                 ego_total_reward /= t
                 npc_total_reward /= t
+                reward_list.append(ego_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.2f} npc_Total_Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
@@ -381,6 +374,11 @@ def main():
                 print('Reset')
 
     finally:
+        # reward图
+        x=np.arange(len(reward_list))
+        y=reward_list
+        plt.plot(x,y)
+        plt.show()
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
