@@ -33,16 +33,17 @@ import carla
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
-parser.add_argument('--target_update_interval', default=2, type=int) # 目标网络更新间隔
-parser.add_argument('--warmup_step', default=10, type=int) # 网络更新预备回合数
+parser.add_argument('--tau',  default=0.005, type=float) # 目标网络软更新系数
+parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
+parser.add_argument('--warmup_step', default=10, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 仿真步长
-parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
+parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+parser.add_argument('--Alearning_rate', default=5e-5, type=float) # Actor学习率
+parser.add_argument('--Clearning_rate', default=5e-4, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=50, type=int) # mini batch size
+
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
@@ -50,10 +51,10 @@ parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染�
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
-parser.add_argument('--load', default=False, type=bool) # load model
-parser.add_argument('--exploration_noise', default=0.1, type=float) # 探索偏移分布 
+parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
+parser.add_argument('--exploration_noise', default=0.3, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=500, type=int) # num of games
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -161,12 +162,12 @@ class DDPG(object):
         self.critic_target = Critic(state_dim, action_dim).to(device)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=args.Clearning_rate)
+        
         self.replay_buffer = Replay_buffer()
         self.writer = SummaryWriter(directory)
 
         self.num_critic_update_iteration = 0
         self.num_actor_update_iteration = 0
-        self.num_training = 0
 
     def select_action(self, state):
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)
@@ -178,6 +179,7 @@ class DDPG(object):
             for it in range(args.update_iteration):
                 # Sample replay buffer
                 x, y, u, r, d = self.replay_buffer.sample(args.batch_size)
+
                 state = torch.FloatTensor(x).to(device)
                 action = torch.FloatTensor(u).to(device)
                 next_state = torch.FloatTensor(y).to(device)
@@ -284,6 +286,7 @@ def main():
                     period = time.time() - start_time                    
                     ego_state = ego_next_state
                     npc_state = npc_next_state
+                    reward_list.append(ego_total_reward)
                 
                 for x in sensor_list:
                     if x.sensor.is_alive:
@@ -332,6 +335,7 @@ def main():
 
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
 
+                    # 数据储存
                     ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward, ego_done))
                     npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward, npc_done))
                     ego_state = ego_next_state
