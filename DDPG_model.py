@@ -53,7 +53,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲�
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.3, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=500, type=int) # num of games
+parser.add_argument('--max_episode', default=500, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -83,7 +83,7 @@ action_dim = len(action_space)
 max_action = torch.tensor(action_space[...,1]).float().to(device)
 min_action = torch.tensor(action_space[...,0]).float().to(device)
 
-directory = './carla-' + 'DDPG' +'./'
+directory = './carla-DDPG./'
 
 class Replay_buffer():
 
@@ -196,19 +196,20 @@ class DDPG(object):
                 # Compute critic loss
                 critic_loss = F.mse_loss(current_Q, target_Q)
                 self.writer.add_scalar('Loss/critic_loss', critic_loss, global_step=self.num_critic_update_iteration)
+                
                 # Optimize the critic
-                self.critic_optimizer.zero_grad()
-                critic_loss.backward()
-                self.critic_optimizer.step()
+                self.critic_optimizer.zero_grad() # 梯度清楚初始化，使得batch梯度不积累
+                critic_loss.backward() # 损失反向传播
+                self.critic_optimizer.step() # 更新
 
                 # Compute actor loss
                 actor_loss = -self.critic(state, self.actor(state)).mean()
                 self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
 
                 # Optimize the actor
-                self.actor_optimizer.zero_grad()
-                actor_loss.backward()
-                self.actor_optimizer.step()
+                self.actor_optimizer.zero_grad() # # 梯度清楚初始化，使得batch梯度不积累
+                actor_loss.backward() # 损失反向传播
+                self.actor_optimizer.step() # 更新
 
                 # Update the frozen target models
                 if it % args.target_update_interval == 0:
