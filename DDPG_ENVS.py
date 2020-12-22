@@ -20,7 +20,7 @@ import copy
 import Simple_Sensors as SS
 
 class Create_Envs(object):
-    def __init__(self,no_rendering_mode=False,fixed_delta_seconds = 0.05):
+    def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
         self.no_rendering_mode = no_rendering_mode
         self.fixed_delta_seconds = fixed_delta_seconds
 
@@ -33,6 +33,7 @@ class Create_Envs(object):
         world = client.load_world('Town04')
         settings = world.get_settings()
         if self.no_rendering_mode:
+            settings.synchronous_mode = False
             settings.no_rendering_mode = True
             settings.fixed_delta_seconds = self.fixed_delta_seconds
         world.apply_settings(settings)
@@ -119,17 +120,17 @@ class Create_Envs(object):
             time.sleep(sim_time)
         ego_next_state = ego.get_transform()
         npc_next_state = npc.get_transform()
-        ego_next_state = np.array([ego_next_state.location.x,ego_next_state.location.y,ego_next_state.rotation.yaw])
-        npc_next_state = np.array([npc_next_state.location.x,npc_next_state.location.y,npc_next_state.rotation.yaw])
+        ego_next_state = np.array([ego_next_state.location.x/250,ego_next_state.location.y/400,ego_next_state.rotation.yaw])
+        npc_next_state = np.array([npc_next_state.location.x/250,npc_next_state.location.y/400,npc_next_state.rotation.yaw])
          # 回报设置:碰撞惩罚、横向惩罚、纵向奖励
-        ego_reward = ego_sensor[0]*(-100) - 2*(ego_next_state[1] - (-370.640472))/370 + (ego_next_state[0] - 245)/245
-        npc_reward = npc_sensor[0]*(-100) - 2*abs(npc_next_state[1] - (-375.140472))/375 + (npc_next_state[0] - 245)/245
+        ego_reward = ego_sensor[0]*(-100) - 2*(ego_next_state[1] - (-370.640472/400)) + (ego_next_state[0] - 245/250) + 1
+        npc_reward = npc_sensor[0]*(-100) - 2*abs(npc_next_state[1] - (-375.140472/400)) + (npc_next_state[0] - 245/250) + 1
         # done结束状态判断
-        if ego_sensor[0]==1 or ego_next_state[0] > 245 or ego_next_state[1] > -367: # ego结束条件ego_done
+        if ego_sensor[0]==1 or ego_next_state[0] > 245/250 or ego_next_state[1] > -367/400: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_sensor[0]==1 or npc_next_state[0] > 245 or npc_next_state[1] > -370: # npc结束条件npc_done
+        if npc_sensor[0]==1 or npc_next_state[0] > 245/250 or npc_next_state[1] > -370/400: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
