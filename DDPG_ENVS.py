@@ -21,6 +21,7 @@ import Simple_Sensors as SS
 
 class Create_Envs(object):
     def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
+        self.synchronous_mode = synchronous_mode
         self.no_rendering_mode = no_rendering_mode
         self.fixed_delta_seconds = fixed_delta_seconds
 
@@ -32,10 +33,9 @@ class Create_Envs(object):
         # 连接世界
         world = client.load_world('Town04')
         settings = world.get_settings()
-        if self.no_rendering_mode:
-            settings.synchronous_mode = False
-            settings.no_rendering_mode = True
-            settings.fixed_delta_seconds = self.fixed_delta_seconds
+        settings.synchronous_mode = self.synchronous_mode
+        settings.no_rendering_mode = self.no_rendering_mode
+        settings.fixed_delta_seconds = self.fixed_delta_seconds
         world.apply_settings(settings)
 
         # 蓝图
@@ -102,20 +102,27 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def set_vehicle_control(self,ego,npc,ego_action,npc_action):  
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau):  
         ego_move,ego_steer = ego_action
         npc_move,npc_steer = npc_action
-        print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
+        ego_steer = c_tau*ego_steer + (1-c_tau)*ego.get_control().steer
+        npc_steer = c_tau*npc_steer + (1-c_tau)*npc.get_control().steer
         if ego_move >= 0:
-            ego_control = carla.VehicleControl(throttle = ego_move, steer = ego_steer, brake = 0)
+            ego_throttle = c_tau*ego_move + (1-c_tau)*ego.get_control().throttle
+            ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
         elif ego_move < 0:
-            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = -ego_move)
+            ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
+            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
         if npc_move >= 0:
-            npc_control = carla.VehicleControl(throttle = npc_move, steer = 0, brake = 0)
+            npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
+            npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
         elif npc_move < 0:
-            npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -npc_move)
+            npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
+            npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
+        print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
+                                           npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
@@ -124,8 +131,8 @@ class Create_Envs(object):
         ego_next_state = np.array([ego_next_state.location.x/250,ego_next_state.location.y/400,ego_next_state.rotation.yaw])
         npc_next_state = np.array([npc_next_state.location.x/250,npc_next_state.location.y/400,npc_next_state.rotation.yaw])
          # 回报设置:碰撞惩罚、横向惩罚、纵向奖励
-        ego_reward = ego_sensor[0]*(-100) - 2*(ego_next_state[1] - (-370.640472/400)) + (ego_next_state[0] - 245/250) + 1
-        npc_reward = npc_sensor[0]*(-100) - 2*abs(npc_next_state[1] - (-375.140472/400)) + (npc_next_state[0] - 245/250) + 1
+        ego_reward = ego_sensor[0]*(-50) - 2*(ego_next_state[1] - (-370.640472/400)) + (ego_next_state[0] - 245/250) + 1
+        npc_reward = npc_sensor[0]*(-50) - 2*abs(npc_next_state[1] - (-375.140472/400)) + (npc_next_state[0] - 245/250) + 1
         # done结束状态判断
         if ego_sensor[0]==1 or ego_next_state[0] > 245/250 or ego_next_state[1] > -367/400: # ego结束条件ego_done
             ego_done = True
