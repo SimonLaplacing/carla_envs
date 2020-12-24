@@ -37,25 +37,25 @@ parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新�
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=10, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=1200, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=50, type=int) # mini batch size
+parser.add_argument('--batch_size', default=80, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.1, type=float) # 无渲染模式下步长,步长建议不大于0.1
+parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.2, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
+parser.add_argument('--exploration_noise', default=0.3, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -249,6 +249,7 @@ def main():
             ego_DDPG.load()
             npc_DDPG.load()
             for i in range(args.test_iteration):
+                #---------动作决策----------
                 ego_total_reward = 0
                 npc_total_reward = 0
                 print('---------%dth time learning begins---------'%i)
@@ -256,9 +257,9 @@ def main():
                 start_time = time.time()  # 初始时间
                 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.rotation.yaw])
+                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.rotation.yaw])
+                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
@@ -271,19 +272,21 @@ def main():
                         min_action.cpu().numpy(), max_action.cpu().numpy())
                     npc_action = np.array(npc_action + np.random.normal(0, 0, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy())
-                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action)
+                    #---------和环境交互动作反馈---------
+                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list)
                     
                     ego_total_reward += ego_reward
                     npc_total_reward += npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     if ego_done: # ego结束条件ego_done
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     if npc_done: # npc结束条件npc_done
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     period = time.time() - start_time                    
                     ego_state = ego_next_state
@@ -317,17 +320,17 @@ def main():
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x,ego_state.location.y,ego_state.rotation.yaw])
+                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x,npc_state.location.y,npc_state.rotation.yaw])
+                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw])
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 start_time = time.time()
 
                 for t in count():
+                    #---------动作决策----------
                     ego_action = ego_DDPG.select_action(ego_state)
                     npc_action = npc_DDPG.select_action(npc_state)
-
                     # 探索偏差调节（先高后低）：
                     if i<=args.max_episode/3:
                         noise = args.exploration_noise
@@ -340,7 +343,10 @@ def main():
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     period = time.time() - start_time
-                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list,ego_action, npc_action, sim_time)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action)
+                    #---------和环境交互动作反馈---------
+                    world.tick()
+                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list)
                     start_time = time.time()  # 开始时间
                     print('period:',period)
                     # 数据储存
@@ -363,7 +369,7 @@ def main():
                 ego_total_reward /= t+1
                 npc_total_reward /= t+1
                 reward_list.append(ego_total_reward)
-                print("Episode: {} step: {} ego_Total_Reward: {:0.2f} npc_Total_Reward: {:0.2f}".format(i, t+1, ego_total_reward, npc_total_reward))
+                print("Episode: {} step: {} ego_Total_Reward: {:0.2f} npc_Total_Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
                 # "Total T: %d Episode Num: %d Episode T: %d Reward: %f

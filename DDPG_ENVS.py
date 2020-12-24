@@ -102,7 +102,7 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_action,npc_action,sim_time=0.05):  
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action):  
         ego_move,ego_steer = ego_action
         npc_move,npc_steer = npc_action
         print('ego:%f,%f,npc:%f,%f'%(ego_move,ego_steer,npc_move,npc_steer))
@@ -116,8 +116,9 @@ class Create_Envs(object):
             npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = -npc_move)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
-        if not self.no_rendering_mode:
-            time.sleep(sim_time)
+    
+    # 车辆信息反馈
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
         ego_next_state = ego.get_transform()
         npc_next_state = npc.get_transform()
         ego_next_state = np.array([ego_next_state.location.x/250,ego_next_state.location.y/400,ego_next_state.rotation.yaw])
