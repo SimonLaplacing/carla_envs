@@ -33,8 +33,8 @@ import carla
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--tau',  default=0.005, type=float) # 目标网络软更新系数
-parser.add_argument('--c_tau',  default=0.5, type=float) # action软更新系数
+parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
+parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=15, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
@@ -48,7 +48,7 @@ parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
 
@@ -273,7 +273,13 @@ def main():
                         min_action.cpu().numpy(), max_action.cpu().numpy())
                     npc_action = np.array(npc_action + np.random.normal(0, 0, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy())
-                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau)
+                    if i<=args.max_episode/3:
+                        c_tau = args.c_tau
+                    elif i<=args.max_episode/2:
+                        c_tau = args.c_tau/2
+                    else:
+                        c_tau = args.c_tau/3
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
                         world.tick()
@@ -343,16 +349,19 @@ def main():
                     # 探索偏差调节（先高后低）：
                     if i<=args.max_episode/3:
                         noise = args.exploration_noise
+                        c_tau = args.c_tau
                     elif i<=args.max_episode/2:
                         noise = args.exploration_noise/2
+                        c_tau = args.c_tau/2
                     else:
                         noise = args.exploration_noise/3
+                        c_tau = args.c_tau/3
                     ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
-                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
                         world.tick()
@@ -408,11 +417,6 @@ def main():
                 print('Reset')
 
     finally:
-        # reward图
-        x=np.arange(len(reward_list))
-        y=reward_list
-        plt.plot(x,y)
-        plt.show()
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
@@ -428,6 +432,11 @@ def main():
             if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
         print('all clean, simulation done!')
+        # reward图
+        x=np.arange(len(reward_list))
+        y=reward_list
+        plt.plot(x,y)
+        plt.show()
 
 
 if __name__ == '__main__':

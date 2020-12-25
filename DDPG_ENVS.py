@@ -82,16 +82,24 @@ class Create_Envs(object):
 
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = ego_transform
-        for i in range(1):
-            obstacle_transform.location += carla.Location(x=95,y=3.7)
-            obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
-            # bp = random.choice(blueprint_library.filter('vehicle'))
-            obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
-            if obstacle is None:
-                print('%s obstacle created failed' % i)
+        for i in range(25):
+            if i == 0:
+                obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
+                obstacle_transform.location += carla.Location(x=95,y=3.8)
+                obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_transform.location += carla.Location(x=0,y=-5.3)
+                if obstacle is None:
+                    print('%s obstacle created failed' % i)
+                else:
+                    obstacle_list.append(obstacle)
+                    print('created %s' % obstacle.type_id)
             else:
+                obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
+                obstacle_transform.location += carla.Location(x=-4,y=7.4)
+                obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_transform.location += carla.Location(y=-7.4)
+                obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
                 obstacle_list.append(obstacle)
-                print('created %s' % obstacle.type_id)
 
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
@@ -102,7 +110,7 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau):  
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time):  
         ego_move,ego_steer = ego_action
         npc_move,npc_steer = npc_action
         ego_steer = c_tau*ego_steer + (1-c_tau)*ego.get_control().steer
@@ -121,6 +129,7 @@ class Create_Envs(object):
             npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
         ego.apply_control(ego_control)
         npc.apply_control(npc_control)
+        # time.sleep(sim_time)
         print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
                                            npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
@@ -128,17 +137,17 @@ class Create_Envs(object):
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
         ego_next_state = ego.get_transform()
         npc_next_state = npc.get_transform()
-        ego_next_state = np.array([ego_next_state.location.x/250,ego_next_state.location.y/400,ego_next_state.rotation.yaw])
-        npc_next_state = np.array([npc_next_state.location.x/250,npc_next_state.location.y/400,npc_next_state.rotation.yaw])
+        ego_next_state = np.array([ego_next_state.location.x/245,ego_next_state.location.y/370,ego_next_state.rotation.yaw])
+        npc_next_state = np.array([npc_next_state.location.x/245,npc_next_state.location.y/370,npc_next_state.rotation.yaw])
          # 回报设置:碰撞惩罚、横向惩罚、纵向奖励
-        ego_reward = ego_sensor[0]*(-50) - 2*(ego_next_state[1] - (-370.640472/400)) + (ego_next_state[0] - 245/250) + 1
-        npc_reward = npc_sensor[0]*(-50) - 2*abs(npc_next_state[1] - (-375.140472/400)) + (npc_next_state[0] - 245/250) + 1
+        ego_reward = ego_sensor[0]*(-50) + (ego_next_state[0] - 245/245) + 0.5
+        npc_reward = npc_sensor[0]*(-50) + (npc_next_state[0] - 245/245) + 0.5
         # done结束状态判断
-        if ego_sensor[0]==1 or ego_next_state[0] > 245/250 or ego_next_state[1] > -367/400: # ego结束条件ego_done
+        if ego_sensor[0]==1 or ego_next_state[0] > 245/245: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_sensor[0]==1 or npc_next_state[0] > 245/250 or npc_next_state[1] > -370/400: # npc结束条件npc_done
+        if npc_sensor[0]==1 or npc_next_state[0] > 245/245: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
