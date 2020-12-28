@@ -32,7 +32,7 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
@@ -43,20 +43,20 @@ parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习�
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=100, type=int) # mini batch size
+parser.add_argument('--batch_size', default=80, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 无渲染模式下步长,步长建议不大于0.1
+parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
+parser.add_argument('--exploration_noise', default=0.5, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 15, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -269,23 +269,21 @@ def main():
                     ego_action = ego_DDPG.select_action(ego_state)
                     npc_action = npc_DDPG.select_action(npc_state)
 
-                    ego_action = np.array(ego_action + np.random.normal(0, 0, size=(action_dim,))).clip(
-                        min_action.cpu().numpy(), max_action.cpu().numpy())
-                    npc_action = np.array(npc_action + np.random.normal(0, 0, size=(action_dim,))).clip(
-                        min_action.cpu().numpy(), max_action.cpu().numpy())
+                    ego_action = np.array(ego_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
+                    npc_action = np.array(npc_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
                     if i<=args.max_episode/3:
                         c_tau = args.c_tau
                     elif i<=args.max_episode/2:
                         c_tau = args.c_tau/2
                     else:
                         c_tau = args.c_tau/3
-                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
-                        world.tick()
+                        world.tick() # 客户端主导，tick
                         # print(world.tick())
                     else:
-                        world.wait_for_tick()
+                        world.wait_for_tick() # 服务器主导，tick
                         # world_snapshot = world.wait_for_tick()
                         # print(world_snapshot.frame)
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
@@ -295,20 +293,20 @@ def main():
                     npc_total_reward += npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     if ego_done: # ego结束条件ego_done
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     if npc_done: # npc结束条件npc_done
-                        print("Episode: {} step: {} ego Total Reward: {:0.2f} npc Total Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
+                        print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                         break
                     # period = time.time() - start_time                    
                     ego_state = ego_next_state
                     npc_state = npc_next_state
 
-                ego_total_reward /= t+1
-                npc_total_reward /= t+1
+                ego_total_reward /= t
+                npc_total_reward /= t
                 reward_list.append(ego_total_reward)
                 
                 for x in sensor_list:
@@ -361,13 +359,13 @@ def main():
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
-                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
-                        world.tick()
+                        world.tick() # 客户端主导，tick
                         # print(world.tick())
                     else:
-                        world.wait_for_tick()
+                        world.wait_for_tick() # 服务器主导，tick
                         # world_snapshot = world.wait_for_tick()
                         # print(world_snapshot.frame)
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
@@ -394,7 +392,7 @@ def main():
                 ego_total_reward /= t
                 npc_total_reward /= t
                 reward_list.append(ego_total_reward)
-                print("Episode: {} step: {} ego_Total_Reward: {:0.2f} npc_Total_Reward: {:0.2f}".format(i+1, t, ego_total_reward, npc_total_reward))
+                print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
                 # "Total T: %d Episode Num: %d Episode T: %d Reward: %f

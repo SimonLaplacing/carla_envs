@@ -82,7 +82,7 @@ class Create_Envs(object):
 
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = ego_transform
-        for i in range(25):
+        for i in range(28):
             if i == 0:
                 obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
                 obstacle_transform.location += carla.Location(x=95,y=3.8)
@@ -95,11 +95,12 @@ class Create_Envs(object):
                     print('created %s' % obstacle.type_id)
             else:
                 obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
-                obstacle_transform.location += carla.Location(x=-4,y=7.4)
+                obstacle_transform.location += carla.Location(x=-3.5,y=7.4)
                 obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_list.append(obstacle1)
                 obstacle_transform.location += carla.Location(y=-7.4)
                 obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
-                obstacle_list.append(obstacle)
+                obstacle_list.append(obstacle2)
 
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
@@ -110,28 +111,40 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time):  
-        ego_move,ego_steer = ego_action
-        npc_move,npc_steer = npc_action
-        ego_steer = c_tau*ego_steer + (1-c_tau)*ego.get_control().steer
-        npc_steer = c_tau*npc_steer + (1-c_tau)*npc.get_control().steer
-        if ego_move >= 0:
-            ego_throttle = c_tau*ego_move + (1-c_tau)*ego.get_control().throttle
-            ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
-        elif ego_move < 0:
-            ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
-            ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
-        if npc_move >= 0:
-            npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-            npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
-        elif npc_move < 0:
-            npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-            npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
-        ego.apply_control(ego_control)
-        npc.apply_control(npc_control)
-        # time.sleep(sim_time)
-        print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
-                                           npc.get_control().throttle,npc_steer,npc.get_control().brake))
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time,step):
+        if step == 0:
+            # 初始速度设定
+            ego_target_speed = carla.Vector3D(12,0,0)
+            npc_target_speed = carla.Vector3D(14,0,0)
+            ego.set_velocity(ego_target_speed)
+            npc.set_velocity(npc_target_speed)
+            print('target velocity is set!')
+            time.sleep(0.01)
+            # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
+            # npc_velocity = npc.get_velocity().x
+        else: 
+            ego_move,ego_steer = ego_action
+            npc_move,npc_steer = npc_action
+            ego_steer = c_tau*ego_steer + (1-c_tau)*ego.get_control().steer
+            npc_steer = c_tau*npc_steer + (1-c_tau)*npc.get_control().steer
+            if ego_move >= 0:
+                ego_throttle = c_tau*ego_move + (1-c_tau)*ego.get_control().throttle
+                ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
+            elif ego_move < 0:
+                ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
+                print('move:',ego.get_control().brake)
+                ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
+            if npc_move >= 0:
+                npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
+                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
+            elif npc_move < 0:
+                npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
+                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
+            ego.apply_control(ego_control)
+            npc.apply_control(npc_control)
+            # time.sleep(sim_time)
+            print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
+                                            npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
@@ -139,9 +152,10 @@ class Create_Envs(object):
         npc_next_state = npc.get_transform()
         ego_next_state = np.array([ego_next_state.location.x/245,ego_next_state.location.y/370,ego_next_state.rotation.yaw])
         npc_next_state = np.array([npc_next_state.location.x/245,npc_next_state.location.y/370,npc_next_state.rotation.yaw])
-         # 回报设置:碰撞惩罚、横向惩罚、纵向奖励
-        ego_reward = ego_sensor[0]*(-50) + (ego_next_state[0] - 245/245) + 0.5
-        npc_reward = npc_sensor[0]*(-50) + (npc_next_state[0] - 245/245) + 0.5
+
+         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
+        ego_reward = ego_sensor[0]*(-50) + (ego_next_state[0] - 245/245) + 0.347
+        npc_reward = npc_sensor[0]*(-50) + (npc_next_state[0] - 245/245) + 0.408
         # done结束状态判断
         if ego_sensor[0]==1 or ego_next_state[0] > 245/245: # ego结束条件ego_done
             ego_done = True
