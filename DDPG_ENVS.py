@@ -132,7 +132,6 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
             elif ego_move < 0:
                 ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
-                print('move:',ego.get_control().brake)
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
@@ -154,8 +153,8 @@ class Create_Envs(object):
         npc_next_state = np.array([npc_next_state.location.x/245,npc_next_state.location.y/370,npc_next_state.rotation.yaw])
 
          # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
-        ego_reward = ego_sensor[0]*(-50) + (ego_next_state[0] - 245/245) + 0.347
-        npc_reward = npc_sensor[0]*(-50) + (npc_next_state[0] - 245/245) + 0.408
+        ego_reward = ego_sensor[0]*(-30) + (ego_next_state[0] - 245/245) + 0.347
+        npc_reward = npc_sensor[0]*(-30) + (npc_next_state[0] - 245/245) + 0.408
         # done结束状态判断
         if ego_sensor[0]==1 or ego_next_state[0] > 245/245: # ego结束条件ego_done
             ego_done = True
