@@ -119,9 +119,7 @@ class Create_Envs(object):
             ego.set_velocity(ego_target_speed)
             npc.set_velocity(npc_target_speed)
             print('target velocity is set!')
-            time.sleep(0.01)
-            # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
-            # npc_velocity = npc.get_velocity().x
+            time.sleep(1.5*sim_time)
         else: 
             ego_move,ego_steer = ego_action
             npc_move,npc_steer = npc_action
@@ -151,10 +149,14 @@ class Create_Envs(object):
         npc_next_state = npc.get_transform()
         ego_next_state = np.array([ego_next_state.location.x/245,ego_next_state.location.y/370,ego_next_state.rotation.yaw])
         npc_next_state = np.array([npc_next_state.location.x/245,npc_next_state.location.y/370,npc_next_state.rotation.yaw])
-
+        # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
+        ego_velocity = ego.get_velocity().x
+        npc_velocity = npc.get_velocity().x
          # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
-        ego_reward = ego_sensor[0]*(-30) + (ego_next_state[0] - 245/245) + 0.347
-        npc_reward = npc_sensor[0]*(-30) + (npc_next_state[0] - 245/245) + 0.408
+        # ego_v = 1 if ego_velocity > 5 else 0
+        # npc_v = 1 if npc_velocity > 5 else 0
+        ego_reward = ego_sensor[0]*(-20) + 0.1*ego_velocity
+        npc_reward = npc_sensor[0]*(-20) + 0.1*npc_velocity
         # done结束状态判断
         if ego_sensor[0]==1 or ego_next_state[0] > 245/245: # ego结束条件ego_done
             ego_done = True
