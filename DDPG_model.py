@@ -42,7 +42,7 @@ parser.add_argument('--max_length_of_trajectory', default=1000, type=int) # 最�
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -258,9 +258,9 @@ def main():
                 # start_time = time.time()  # 初始时间
                 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw])
+                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/60])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw])
+                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/60])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
@@ -331,9 +331,9 @@ def main():
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw])
+                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/60])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw])
+                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/60])
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 # start_time = time.time()
@@ -385,10 +385,10 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done: # ego结束条件ego_done
+                    if ego_done and npc_done: # ego结束条件ego_done
                         break
-                    if npc_done: # npc结束条件npc_done
-                        break
+                    # if npc_done: # npc结束条件npc_done
+                    #     break
 
                 ego_total_reward /= t
                 npc_total_reward /= t
