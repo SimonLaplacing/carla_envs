@@ -55,7 +55,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -348,13 +348,13 @@ def main():
                         c_tau = args.c_tau
                     elif i<=args.max_episode/2:
                         noise = args.exploration_noise*0.75
-                        c_tau = args.c_tau*0.75
+                        c_tau = args.c_tau
                     elif i<=args.max_episode*0.75:
                         noise = args.exploration_noise*0.5
-                        c_tau = args.c_tau*0.5
+                        c_tau = args.c_tau
                     else:
                         noise = args.exploration_noise*0.25
-                        c_tau = args.c_tau*0.25
+                        c_tau = args.c_tau
                     ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                         min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
@@ -404,14 +404,14 @@ def main():
                     if x.sensor.is_alive:
                         x.sensor.destroy()            
                 for x in ego_list:
-                    if x.is_alive:
-                        client.apply_batch([carla.command.DestroyActor(x)])
+                    # if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
                 for x in npc_list:
-                    if x.is_alive:
-                        client.apply_batch([carla.command.DestroyActor(x)])
+                    # if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
                 for x in obstacle_list:
-                    if x.is_alive:
-                        client.apply_batch([carla.command.DestroyActor(x)])
+                    # if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
                 print('Reset')
 
     finally:
@@ -421,14 +421,14 @@ def main():
             if x.sensor.is_alive:
                 x.sensor.destroy()
         for x in ego_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
+            # if x.is_alive:
+            client.apply_batch([carla.command.DestroyActor(x)])
         for x in npc_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
+            # if x.is_alive:
+            client.apply_batch([carla.command.DestroyActor(x)])
         for x in obstacle_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
+            # if x.is_alive:
+            client.apply_batch([carla.command.DestroyActor(x)])
         print('all clean, simulation done!')
         # reward图
         x=np.arange(len(reward_list))
