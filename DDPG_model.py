@@ -20,7 +20,7 @@ import DDPG_ENVS
 import time
 
 try:
-    sys.path.append(glob.glob('D:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('D:/CARLA_0.9.11/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -42,7 +42,7 @@ parser.add_argument('--max_length_of_trajectory', default=1000, type=int) # 最�
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=8000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -50,13 +50,13 @@ parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.1, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -258,9 +258,9 @@ def main():
                 # start_time = time.time()  # 初始时间
                 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/60])
+                ego_state = np.array([(ego_next_state.location.x-120)/125,(ego_next_state.location.y+375)/4,ego_next_state.rotation.yaw/90])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/60])
+                npc_state = np.array([(npc_next_state.location.x-120)/125,(npc_next_state.location.y+375)/4,npc_next_state.rotation.yaw/90])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
@@ -331,9 +331,9 @@ def main():
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
                 ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/60])
+                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/90])
                 npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/60])
+                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/90])
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 # start_time = time.time()
@@ -396,7 +396,6 @@ def main():
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
-                # "Total T: %d Episode Num: %d Episode T: %d Reward: %f
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')

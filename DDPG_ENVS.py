@@ -3,7 +3,7 @@ import os
 import sys
 import numpy as np
 try:
-    sys.path.append(glob.glob('D:/CARLA_0.9.10-Pre_Win/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('D:/CARLA_0.9.11/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -116,8 +116,8 @@ class Create_Envs(object):
             # 初始速度设定
             ego_target_speed = carla.Vector3D(12,0,0)
             npc_target_speed = carla.Vector3D(14,0,0)
-            ego.set_velocity(ego_target_speed)
-            npc.set_velocity(npc_target_speed)
+            ego.set_target_velocity(ego_target_speed)
+            npc.set_target_velocity(npc_target_speed)
             print('target velocity is set!')
             time.sleep(1.5*sim_time)
         else: 
@@ -147,21 +147,20 @@ class Create_Envs(object):
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
         ego_next_state = ego.get_transform()
         npc_next_state = npc.get_transform()
-        print('angle:',ego_next_state.rotation.yaw)
-        ego_next_state = np.array([ego_next_state.location.x/245,ego_next_state.location.y/370,ego_next_state.rotation.yaw/60])
-        npc_next_state = np.array([npc_next_state.location.x/245,npc_next_state.location.y/370,npc_next_state.rotation.yaw/60])
+        ego_next_state = np.array([(ego_next_state.location.x-120)/125,(ego_next_state.location.y+375)/4,ego_next_state.rotation.yaw/90])
+        npc_next_state = np.array([(npc_next_state.location.x-120)/125,(npc_next_state.location.y+375)/4,npc_next_state.rotation.yaw/90])
         # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
          # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
-        ego_reward = ego_sensor[0]*(-20) + 0.1*ego_velocity
-        npc_reward = npc_sensor[0]*(-20) + 0.1*npc_velocity
+        ego_reward = ego_sensor[0]*(-20) + 0.5*ego_velocity
+        npc_reward = npc_sensor[0]*(-20) + 0.5*npc_velocity
         # done结束状态判断
-        if ego_sensor[0]==1 or ego_next_state[0] > 245/245: # ego结束条件ego_done
+        if ego_sensor[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_sensor[0]==1 or npc_next_state[0] > 245/245: # npc结束条件npc_done
+        if npc_sensor[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
