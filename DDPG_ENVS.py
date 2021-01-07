@@ -107,7 +107,7 @@ class Create_Envs(object):
         npc_collision = SS.CollisionSensor(npc)
         ego_invasion = SS.LaneInvasionSensor(ego)
         npc_invasion = SS.LaneInvasionSensor(npc)
-        sensor_list.extend([ego_collision,ego_invasion],[npc_collision,npc_invasion])
+        sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
@@ -155,14 +155,22 @@ class Create_Envs(object):
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
          # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
-        ego_reward = ego_sensor[0]*(-20) + 0.5*ego_velocity
-        npc_reward = npc_sensor[0]*(-20) + 0.5*npc_velocity
+        ego_col = ego_sensor[0].get_collision_history()
+        npc_col = npc_sensor[0].get_collision_history()
+        ego_inv = ego_sensor[1].get_invasion_history()
+        npc_inv = npc_sensor[1].get_invasion_history()
+        ego_reward = ego_col[0]*(-20) + ego_inv[0]*(-1) + 0.5*ego_velocity
+        npc_reward = npc_col[0]*(-20) + npc_inv[0]*(-1) + 0.5*npc_velocity
+        ego_sensor[1].reset()
+        npc_sensor[1].reset()
+
+        # ego_inv[-1]
         # done结束状态判断
-        if ego_sensor[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
+        if ego_col[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_sensor[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
+        if npc_col[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  

@@ -264,8 +264,8 @@ def main():
                 npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
                 (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
 
-                egocol_list = sensor_list[0].get_collision_history()
-                npccol_list = sensor_list[1].get_collision_history()
+                egosen_list = sensor_list[0]
+                npcsen_list = sensor_list[1]
 
                 for t in count():
                     ego_action = ego_DDPG.select_action(ego_state)
@@ -289,7 +289,7 @@ def main():
                         # world_snapshot = world.wait_for_tick()
                         # print(world_snapshot.frame)
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
-                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list)
+                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
                     
                     ego_total_reward += ego_reward
                     npc_total_reward += npc_reward
@@ -339,8 +339,8 @@ def main():
                 npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
                 (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
 
-                egocol_list = sensor_list[0].get_collision_history()
-                npccol_list = sensor_list[1].get_collision_history()
+                egosen_list = sensor_list[0]
+                npcsen_list = sensor_list[1]
                 # start_time = time.time()
 
                 for t in count():
@@ -375,7 +375,7 @@ def main():
                         # world_snapshot = world.wait_for_tick()
                         # print(world_snapshot.frame)
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
-                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egocol_list, npccol_list)
+                    ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
                     # start_time = time.time()  # 开始时间
                     # print('period:',period)
                     # 数据储存
@@ -405,7 +405,10 @@ def main():
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')
 
-                for x in sensor_list:
+                for x in sensor_list[0]:
+                    if x.sensor.is_alive:
+                        x.sensor.destroy()
+                for x in sensor_list[1]:
                     if x.sensor.is_alive:
                         x.sensor.destroy()            
                 for x in ego_list:
@@ -422,7 +425,10 @@ def main():
     finally:
         # 清洗环境
         print('Start Cleaning Envs')
-        for x in sensor_list:
+        for x in sensor_list[0]:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
+        for x in sensor_list[1]:
             if x.sensor.is_alive:
                 x.sensor.destroy()
         for x in ego_list:

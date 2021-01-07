@@ -79,7 +79,10 @@ class LaneInvasionSensor(object):
 
     def get_invasion_history(self):
         return self.history
-
+    
+    def reset(self):
+        self.history = [0]
+        
     @staticmethod
     def _on_invasion(weak_self, event):
         """On invasion method"""
