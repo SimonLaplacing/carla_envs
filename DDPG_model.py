@@ -257,10 +257,12 @@ def main():
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
                 # start_time = time.time()  # 初始时间
                 
-                ego_state = ego_list[0].get_transform()
-                ego_state = np.array([(ego_next_state.location.x-120)/125,(ego_next_state.location.y+375)/4,ego_next_state.rotation.yaw/90])
-                npc_state = npc_list[0].get_transform()
-                npc_state = np.array([(npc_next_state.location.x-120)/125,(npc_next_state.location.y+375)/4,npc_next_state.rotation.yaw/90])
+                ego_transform = ego_list[0].get_transform()
+                npc_transform = npc_list[0].get_transform()
+                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
+                (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
+                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
+                (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
 
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
@@ -330,10 +332,13 @@ def main():
                 print('------------%dth time learning begins-----------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
-                ego_state = ego_list[0].get_transform()
-                ego_state = np.array([ego_state.location.x/250,ego_state.location.y/400,ego_state.rotation.yaw/90])
-                npc_state = npc_list[0].get_transform()
-                npc_state = np.array([npc_state.location.x/250,npc_state.location.y/400,npc_state.rotation.yaw/90])
+                ego_transform = ego_list[0].get_transform()
+                npc_transform = npc_list[0].get_transform()
+                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
+                (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
+                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
+                (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+
                 egocol_list = sensor_list[0].get_collision_history()
                 npccol_list = sensor_list[1].get_collision_history()
                 # start_time = time.time()

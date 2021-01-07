@@ -107,7 +107,7 @@ class Create_Envs(object):
         npc_collision = SS.CollisionSensor(npc)
         ego_invasion = SS.LaneInvasionSensor(ego)
         npc_invasion = SS.LaneInvasionSensor(npc)
-        sensor_list.extend([ego_collision,npc_collision,ego_invasion,npc_invasion])
+        sensor_list.extend([ego_collision,ego_invasion],[npc_collision,npc_invasion])
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
@@ -145,10 +145,12 @@ class Create_Envs(object):
     
     # 车辆信息反馈
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
-        ego_next_state = ego.get_transform()
-        npc_next_state = npc.get_transform()
-        ego_next_state = np.array([(ego_next_state.location.x-120)/125,(ego_next_state.location.y+375)/4,ego_next_state.rotation.yaw/90])
-        npc_next_state = np.array([(npc_next_state.location.x-120)/125,(npc_next_state.location.y+375)/4,npc_next_state.rotation.yaw/90])
+        ego_next_transform = ego.get_transform()
+        npc_next_transform = npc.get_transform()
+        ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
+        (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
+        npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
+        (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
         # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
@@ -173,5 +175,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0] # x,y,yaw
+        state_space = [0,0,0,0,0,0] # ego_x,y,yaw;npc_x,y,yaw
         return state_space
