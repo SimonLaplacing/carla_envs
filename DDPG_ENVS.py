@@ -151,15 +151,17 @@ class Create_Envs(object):
         (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
         (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-        # ego_velocity = (ego.get_velocity().x**2 + ego.get_velocity().y**2)**0.5
+        # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
-         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
+        ego_acceleration = abs(ego.get_acceleration().y)
+        # 碰撞、变道检测
         ego_col = ego_sensor[0].get_collision_history()
         npc_col = npc_sensor[0].get_collision_history()
         ego_inv = ego_sensor[1].get_invasion_history()
         npc_inv = npc_sensor[1].get_invasion_history()
-        ego_reward = ego_col[0]*(-20) + ego_inv[0]*(-1) + 0.5*ego_velocity
+        # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
+        ego_reward = ego_col[0]*(-20) + ego_inv[0]*(-1) + 0.5*ego_velocity + ego_acceleration*(-0.2)
         npc_reward = npc_col[0]*(-20) + npc_inv[0]*(-1) + 0.5*npc_velocity
         ego_sensor[1].reset()
         npc_sensor[1].reset()

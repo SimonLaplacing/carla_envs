@@ -53,7 +53,7 @@ parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
-parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
+parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数

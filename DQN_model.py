@@ -30,7 +30,7 @@ EPISILO = 0.9
 MEMORY_CAPACITY = 20 # when to train
 Q_NETWORK_ITERATION = 10 # when to update
 
-create_envs = DQN_ENVS.Create_Envs()
+create_envs = DQN_ENVS.Create_Envs(synchronous_mode = True)
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 NUM_ACTIONS = len(action_space)
@@ -137,6 +137,7 @@ def main():
             npccol_list = sensor_list[1].get_collision_history()
             ego_action = ego_dqn.choose_action(state)
             npc_action = npc_dqn.choose_action(state)
+            ego_action,npc_action = 0,0
             action = [ego_action,npc_action]
             print('action is',action)
             reward = create_envs.get_reward(action)
@@ -156,17 +157,18 @@ def main():
             time.sleep(1)
             
             # action
+            flag = 1
             while state:  
                 sim_time = time.time() - start_time
                 
-                create_envs.get_ego_step(ego_list[0],ego_action,sim_time)       
-                create_envs.get_npc_step(npc_list[0],npc_action,sim_time)
-
-                if egocol_list[0] or npccol_list[0] or sim_time > 12: # 发生碰撞，重置场景
+                create_envs.get_ego_step(ego_list[0],ego_action,sim_time,flag)       
+                create_envs.get_npc_step(npc_list[0],npc_action,sim_time,flag)
+                flag = 0
+                if egocol_list[0] and npccol_list[0] or sim_time > 8: # 发生碰撞，重置场景
                     state = state_space[0]
 
             # print(reward)
-            time.sleep(1)
+            # time.sleep(1)
 
             for x in sensor_list:
                 if x.sensor.is_alive:
@@ -183,12 +185,12 @@ def main():
 
             print('Reset')
     finally:
-        rew = open('reward.txt','w+')
-        rew.write(str(reward_list))
-        rew.close()
-        x = np.linspace(0,len(reward_list),len(reward_list))
-        plt.plot(x,reward_list)
-        plt.show()
+        # rew = open('reward.txt','w+')
+        # rew.write(str(reward_list))
+        # rew.close()
+        # x = np.linspace(0,len(reward_list),len(reward_list))
+        # plt.plot(x,reward_list)
+        # plt.show()
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:

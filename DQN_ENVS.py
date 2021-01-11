@@ -20,11 +20,15 @@ import copy
 import Simple_Sensors as SS
 
 class Create_Envs(object):
+    def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
+        self.synchronous_mode = synchronous_mode
+        self.no_rendering_mode = no_rendering_mode
+        self.fixed_delta_seconds = fixed_delta_seconds
 
     def connection(self):
         # 连接客户端:localhost:2000\192.168.199.238:2000
         client = carla.Client('localhost', 2000)
-        client.set_timeout(20.0)
+        client.set_timeout(10.0)
 
         # 连接世界
         world = client.load_world('Town04')
@@ -53,7 +57,7 @@ class Create_Envs(object):
         # spec_transform = ego.get_transform()
         spec_transform = Transform(Location(x=140.341522, y=-375.140472, z=15.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        spec_transform.location += carla.Location(x=60,z=35)
+        spec_transform.location += carla.Location(x=60,z=45)
         spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
         spectator.set_transform(spec_transform)
 
@@ -62,6 +66,7 @@ class Create_Envs(object):
         for i in range(1):
             npc_transform.location += carla.Location(x=-15,y=-3.5)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+            npc_bp.set_attribute('color', '229,28,0')
             npc = world.try_spawn_actor(npc_bp, npc_transform)
             if npc is None:
                 print('%s npc created failed' % i)
@@ -71,16 +76,25 @@ class Create_Envs(object):
 
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = ego_transform
-        for i in range(1):
-            obstacle_transform.location += carla.Location(x=95,y=3.7)
-            obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
-            # bp = random.choice(blueprint_library.filter('vehicle'))
-            obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
-            if obstacle is None:
-                print('%s obstacle created failed' % i)
+        for i in range(28):
+            if i == 0:
+                obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
+                obstacle_transform.location += carla.Location(x=95,y=3.8)
+                obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_transform.location += carla.Location(x=0,y=-5.3)
+                if obstacle is None:
+                    print('%s obstacle created failed' % i)
+                else:
+                    obstacle_list.append(obstacle)
+                    print('created %s' % obstacle.type_id)
             else:
-                obstacle_list.append(obstacle)
-                print('created %s' % obstacle.type_id)
+                obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
+                obstacle_transform.location += carla.Location(x=-3.5,y=7.4)
+                obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_list.append(obstacle1)
+                obstacle_transform.location += carla.Location(y=-7.4)
+                obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_list.append(obstacle2)
 
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
@@ -91,52 +105,56 @@ class Create_Envs(object):
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def get_ego_step(self,ego,action,sim_time): # 1变道 2刹车
-        if action == 0:
-            if 0 < sim_time <= 1.2:
-                ego_control = carla.VehicleControl(throttle = 0, steer = 0)
-                ego.apply_control(ego_control) 
-            elif 7 < sim_time <= 7.7:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = -0.1)
+    def get_ego_step(self,ego,action,sim_time,flag): # 0加速变道 1刹车变道
+        if flag == 1:
+            ego_target_speed = carla.Vector3D(18,0,0)
+            ego.set_target_velocity(ego_target_speed)
+            print('ego velocity is set!')
+        if action == 0: 
+            if 1 < sim_time <= 1.55:
+                ego_control = carla.VehicleControl(throttle = 1, steer = -0.1)
                 ego.apply_control(ego_control)                
-            elif 7.7 < sim_time <= 8.4:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = 0.1)
-                ego.apply_control(ego_control)
-            elif sim_time > 8.4:
-                ego_control = carla.VehicleControl(throttle = 0.5, steer = 0)
+            elif 1.55 < sim_time <= 2.1:
+                ego_control = carla.VehicleControl(throttle = 1, steer = 0.1)
                 ego.apply_control(ego_control)
             else:
-                ego_control = carla.VehicleControl(throttle = 1, steer = 0)
+                ego_control = carla.VehicleControl(throttle = 1, brake = 0)
                 ego.apply_control(ego_control)
         
         if action == 1:
-            if 0 < sim_time <= 6:
-                ego_control = carla.VehicleControl(throttle = 0.9, steer = 0)
-                ego.apply_control(ego_control) 
+            if 1.25 <= sim_time <= 2:
+                ego_control = carla.VehicleControl(throttle = 0, brake = 1)
+                ego.apply_control(ego_control)
+            elif 2 < sim_time <= 2.7:
+                ego_control = carla.VehicleControl(throttle = 1, steer = -0.1)
+                ego.apply_control(ego_control)                
+            elif 2.7 < sim_time <= 3.4:
+                ego_control = carla.VehicleControl(throttle = 1, steer = 0.1)
+                ego.apply_control(ego_control)
+            elif sim_time > 3.4:
+                ego_control = carla.VehicleControl(throttle = 1, steer = 0)
+                ego.apply_control(ego_control)
             else:
-                ego_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0.2)
+                ego_control = carla.VehicleControl(throttle = 0, brake = 0)
                 ego.apply_control(ego_control)
             
 
-    def get_npc_step(self,npc,action,sim_time): # 1刹车 2加速
+    def get_npc_step(self,npc,action,sim_time,flag): # 0刹车 1加速
+        if flag == 1:
+            npc_target_speed = carla.Vector3D(28,0,0)
+            npc.set_target_velocity(npc_target_speed)
+            print('npc velocity is set!')
         if action == 0:
-            if 0 < sim_time <= 6:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control)
-            elif 6 < sim_time <= 7:
-                npc_control = carla.VehicleControl(throttle = 0, brake = 0.1)
-                npc.apply_control(npc_control)                     
+            if 0.5 < sim_time <= 2:
+                npc_control = carla.VehicleControl(throttle = 0, brake = 0.4)
+                npc.apply_control(npc_control)                   
             else:
-                npc_control = carla.VehicleControl(throttle = 0.5, brake = 0)
+                npc_control = carla.VehicleControl(throttle = 1, brake = 0)
                 npc.apply_control(npc_control)
 
         if action == 1:
-            if 0 < sim_time <= 2:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control) 
-            else:
-                npc_control = carla.VehicleControl(throttle = 1)
-                npc.apply_control(npc_control)
+            npc_control = carla.VehicleControl(throttle = 1)
+            npc.apply_control(npc_control)
 
     def get_action_space(self):
         action_space = np.array([0,1])
@@ -154,5 +172,5 @@ class Create_Envs(object):
         elif action == [1,1]:
             reward = 4
         else:
-            reward = 1
+            reward = -100
         return reward
