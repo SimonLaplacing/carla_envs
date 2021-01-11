@@ -161,7 +161,7 @@ class Create_Envs(object):
         ego_inv = ego_sensor[1].get_invasion_history()
         npc_inv = npc_sensor[1].get_invasion_history()
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
-        ego_reward = ego_col[0]*(-20) + ego_inv[0]*(-1) + 0.5*ego_velocity + ego_acceleration*(-0.2)
+        ego_reward = ego_col[0]*(-20) + ego_inv[0]*(-1) + 0.5*ego_velocity + ego_acceleration*(-0.5)
         npc_reward = npc_col[0]*(-20) + npc_inv[0]*(-1) + 0.5*npc_velocity
         ego_sensor[1].reset()
         npc_sensor[1].reset()
