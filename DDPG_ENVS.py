@@ -147,10 +147,12 @@ class Create_Envs(object):
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
-        ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
-        (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
-        npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
-        (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
+        # ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
+        # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
+        # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
+        # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
+        ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
+        npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
@@ -185,5 +187,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0] # ego_x,y,yaw;npc_x,y,yaw
+        state_space = [0,0,0] # ego_x,y,yaw;npc_x,y,yaw
         return state_space

@@ -36,7 +36,7 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
-parser.add_argument('--warmup_step', default=15, type=int) # 网络参数训练更新预备回合数
+parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=1000, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
@@ -82,6 +82,7 @@ action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
 state_dim = len(state_space)
 action_dim = len(action_space)
+actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float().to(device)
 min_action = torch.tensor(action_space[...,0]).float().to(device)
 
@@ -103,24 +104,25 @@ class Replay_buffer():
 
     def sample(self, batch_size):
         ind = np.random.randint(0, len(self.storage), size=batch_size)
-        x, y, u, r, d = [], [], [], [], []
+        x, y, u, uy, r, d = [], [], [], [], [], []
 
         for i in ind:
-            X, Y, U, R, D = self.storage[i]
+            X, Y, U, UY, R, D = self.storage[i]
             x.append(np.array(X, copy=False))
             y.append(np.array(Y, copy=False))
             u.append(np.array(U, copy=False))
+            uy.append(np.array(UY, copy=False))
             r.append(np.array(R, copy=False))
             d.append(np.array(D, copy=False))
 
-        return np.array(x), np.array(y), np.array(u), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
+        return np.array(x), np.array(y), np.array(u), np.array(uy), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
 
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 100)
+        self.l1 = nn.Linear(state_dim*actor_num, 100)
         # self.l1.weight.data.normal_(1,1)
         self.l2 = nn.Linear(100, 50)
         # self.l2.weight.data.normal_(1,1)
@@ -139,7 +141,7 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, 100)
+        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 100)
         # self.l1.weight.data.normal_(1,1)
         self.l2 = nn.Linear(100 , 50)
         # self.l2.weight.data.normal_(1,1)
@@ -174,22 +176,27 @@ class DDPG(object):
     def select_action(self, state):
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         return self.actor(state).cpu().data.numpy().flatten()
+    
+    def select_next_action(self, next_state):
+        next_state = torch.FloatTensor(next_state.reshape(1, -1)).to(device)
+        return self.actor_target(next_state).cpu().data.numpy().flatten()
 
     def update(self,curr_epi):
 
         if curr_epi > args.warmup_step:
             for it in range(args.update_iteration):
                 # Sample replay buffer
-                x, y, u, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、奖励、是否结束标志
+                x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、奖励、是否结束标志
 
                 state = torch.FloatTensor(x).to(device)
                 action = torch.FloatTensor(u).to(device)
                 next_state = torch.FloatTensor(y).to(device)
+                next_action = torch.FloatTensor(uy).to(device)
                 done = torch.FloatTensor(1-d).to(device)
                 reward = torch.FloatTensor(r).to(device)
 
                 # Compute the target Q value
-                target_Q = self.critic_target(next_state, self.actor_target(next_state))
+                target_Q = self.critic_target(next_state, next_action)
                 target_Q = reward + (done * args.gamma * target_Q).detach()
 
                 # Get current Q estimate
@@ -205,7 +212,7 @@ class DDPG(object):
                 self.critic_optimizer.step() # 更新
 
                 # Compute actor loss
-                actor_loss = -self.critic(state, self.actor(state)).mean()
+                actor_loss = -self.critic(state, action).mean()
                 self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
 
                 # Optimize the actor
@@ -259,17 +266,19 @@ def main():
                 
                 ego_transform = ego_list[0].get_transform()
                 npc_transform = npc_list[0].get_transform()
-                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
-                (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
-                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
-                (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                # ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
+                # (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
+                # npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
+                # (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
 
                 egosen_list = sensor_list[0]
                 npcsen_list = sensor_list[1]
 
                 for t in count():
-                    ego_action = ego_DDPG.select_action(ego_state)
-                    npc_action = npc_DDPG.select_action(npc_state)
+                    ego_action = ego_DDPG.select_action(np.concatenate((ego_state, npc_state)))
+                    npc_action = npc_DDPG.select_action(np.concatenate((npc_state, ego_state)))
 
                     ego_action = np.array(ego_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
                     npc_action = np.array(npc_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
@@ -334,10 +343,12 @@ def main():
 
                 ego_transform = ego_list[0].get_transform()
                 npc_transform = npc_list[0].get_transform()
-                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
-                (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
-                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
-                (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                # ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90,
+                # (npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
+                # npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90,
+                # (ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                ego_state = np.array([(ego_transform.location.x-120)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
+                npc_state = np.array([(npc_transform.location.x-120)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
 
                 egosen_list = sensor_list[0]
                 npcsen_list = sensor_list[1]
@@ -345,8 +356,8 @@ def main():
 
                 for t in count():
                     #---------动作决策----------
-                    ego_action = ego_DDPG.select_action(ego_state)
-                    npc_action = npc_DDPG.select_action(npc_state)
+                    ego_action = ego_DDPG.select_action(np.concatenate((ego_state, npc_state)))
+                    npc_action = npc_DDPG.select_action(np.concatenate((npc_state, ego_state)))
                     # 探索偏差调节（先高后低）：
                     if i<=args.max_episode/4:
                         noise = args.exploration_noise
@@ -378,9 +389,13 @@ def main():
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
                     # start_time = time.time()  # 开始时间
                     # print('period:',period)
+                    ego_next_action = ego_DDPG.select_next_action(np.concatenate((ego_next_state, npc_next_state)))
+                    npc_next_action = npc_DDPG.select_next_action(np.concatenate((npc_next_state, ego_next_state)))
                     # 数据储存
-                    ego_DDPG.replay_buffer.push((ego_state, ego_next_state, ego_action, ego_reward, ego_done))
-                    npc_DDPG.replay_buffer.push((npc_state, npc_next_state, npc_action, npc_reward, npc_done))
+                    ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
+                        np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
+                    npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
+                        np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
