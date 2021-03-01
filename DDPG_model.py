@@ -38,11 +38,11 @@ parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=1000, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=8000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -54,8 +54,8 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
+parser.add_argument('--exploration_noise', default=0.5, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=3000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -186,7 +186,7 @@ class DDPG(object):
         if curr_epi > args.warmup_step:
             for it in range(args.update_iteration):
                 # Sample replay buffer
-                x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、奖励、是否结束标志
+                x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、下个动作、奖励、是否结束标志
 
                 state = torch.FloatTensor(x).to(device)
                 action = torch.FloatTensor(u).to(device)
@@ -405,10 +405,8 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done and npc_done: # ego结束条件ego_done
+                    if ego_done or npc_done: # ego结束条件ego_done
                         break
-                    # if npc_done: # npc结束条件npc_done
-                    #     break
 
                 ego_total_reward /= t
                 npc_total_reward /= t
