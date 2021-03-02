@@ -38,7 +38,7 @@ parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
@@ -54,7 +54,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.5, type=float) # 探索偏移分布 
+parser.add_argument('--exploration_noise', default=0.2, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=3000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
@@ -313,8 +313,8 @@ def main():
                     ego_state = ego_next_state
                     npc_state = npc_next_state
 
-                ego_total_reward /= t
-                npc_total_reward /= t
+                # ego_total_reward /= t
+                # npc_total_reward /= t
                 print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 reward_list.append(ego_total_reward)
                 
@@ -405,11 +405,11 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done or npc_done: # ego结束条件ego_done
+                    if ego_done or npc_done: # 结束条件
                         break
 
-                ego_total_reward /= t
-                npc_total_reward /= t
+                # ego_total_reward /= t
+                # npc_total_reward /= t
                 reward_list.append(ego_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
