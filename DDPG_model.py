@@ -34,7 +34,7 @@ import carla
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
-parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
+parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
