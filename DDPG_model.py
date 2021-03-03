@@ -38,11 +38,11 @@ parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=10000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=15000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=100, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -54,8 +54,8 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.2, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=3000, type=int) # 仿真次数
+parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -122,18 +122,18 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim*actor_num, 100)
+        self.l1 = nn.Linear(state_dim*actor_num, 300)
         # self.l1.weight.data.normal_(1,1)
-        self.l2 = nn.Linear(100, 50)
-        # self.l2.weight.data.normal_(1,1)
-        self.l3 = nn.Linear(50, action_dim)
-        # self.l3.weight.data.normal_(1,1)
+        self.l2 = nn.Linear(300, 150)
+        self.l3 = nn.Linear(150, 50)
+        self.l4 = nn.Linear(50, action_dim)
         self.max_action = max_action
 
     def forward(self, x):
         x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        x = self.max_action * torch.tanh(self.l3(x))
+        x = F.relu(self.l3(x))
+        x = self.max_action * torch.tanh(self.l4(x))
         return x
 
 
@@ -141,17 +141,16 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 100)
-        # self.l1.weight.data.normal_(1,1)
-        self.l2 = nn.Linear(100 , 50)
-        # self.l2.weight.data.normal_(1,1)
-        self.l3 = nn.Linear(50, 1)
-        # self.l3.weight.data.normal_(1,1)
+        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 300)
+        self.l2 = nn.Linear(300 , 150)
+        self.l3 = nn.Linear(150 , 50)
+        self.l4 = nn.Linear(50, 1)
 
     def forward(self, x, u):
         x = F.relu(self.l1(torch.cat([x, u], 1)))
         x = F.relu(self.l2(x))
-        x = self.l3(x)
+        x = F.relu(self.l3(x))
+        x = self.l4(x)
         return x
 
 
@@ -250,7 +249,8 @@ def main():
     npc_DDPG = DDPG(state_dim, action_dim, max_action)
     sim_time = args.fixed_delta_seconds  # 每步仿真时间
     client, world, blueprint_library = create_envs.connection()
-    reward_list = []
+    ego_reward_list = []
+    npc_reward_list = []
 
     try:
         if args.mode == 'test':
@@ -300,8 +300,8 @@ def main():
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
                     
-                    ego_total_reward += ego_reward
-                    npc_total_reward += npc_reward
+                    ego_total_reward = ego_reward
+                    npc_total_reward = npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
@@ -316,7 +316,7 @@ def main():
                 # ego_total_reward /= t
                 # npc_total_reward /= t
                 print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                reward_list.append(ego_total_reward)
+                ego_reward_list.append(ego_total_reward)
                 
                 for x in sensor_list:
                     if x.sensor.is_alive:
@@ -400,8 +400,8 @@ def main():
                     ego_state = ego_next_state
                     npc_state = npc_next_state
                     
-                    ego_total_reward += ego_reward
-                    npc_total_reward += npc_reward
+                    ego_total_reward = ego_reward
+                    npc_total_reward = npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
@@ -410,7 +410,8 @@ def main():
 
                 # ego_total_reward /= t
                 # npc_total_reward /= t
-                reward_list.append(ego_total_reward)
+                ego_reward_list.append(ego_total_reward)
+                npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
@@ -454,10 +455,18 @@ def main():
             # if x.is_alive:
             client.apply_batch([carla.command.DestroyActor(x)])
         print('all clean, simulation done!')
+
         # reward图
-        x=np.arange(len(reward_list))
-        y=reward_list
-        plt.plot(x,y)
+        x1=np.arange(len(ego_reward_list))
+        y1=ego_reward_list
+        x2=np.arange(len(npc_reward_list))
+        y2=npc_reward_list
+        plt.figure(figsize=(8,8), dpi=80)
+        plt.figure(1)
+        ax1 = plt.subplot(211)
+        ax1.plot(x1,y1)
+        ax2 = plt.subplot(212)
+        ax2.plot(x2,y2)
         plt.show()
 
 
