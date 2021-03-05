@@ -56,7 +56,7 @@ parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -405,7 +405,7 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done or npc_done: # 结束条件
+                    if ego_done and npc_done: # 结束条件
                         break
 
                 # ego_total_reward /= t
