@@ -38,19 +38,19 @@ parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=15000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=100, type=int) # mini batch size
+parser.add_argument('--capacity', default=20000, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.01, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
@@ -122,11 +122,11 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim*actor_num, 300)
-        # self.l1.weight.data.normal_(1,1)
-        self.l2 = nn.Linear(300, 150)
-        self.l3 = nn.Linear(150, 50)
-        self.l4 = nn.Linear(50, action_dim)
+        self.l1 = nn.Linear(state_dim*actor_num, 128)
+        # self.l1.weight.data.normal_(1e-1,1e-1)
+        self.l2 = nn.Linear(128, 64)
+        self.l3 = nn.Linear(64, 16)
+        self.l4 = nn.Linear(16, action_dim)
         self.max_action = max_action
 
     def forward(self, x):
@@ -141,10 +141,10 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 300)
-        self.l2 = nn.Linear(300 , 150)
-        self.l3 = nn.Linear(150 , 50)
-        self.l4 = nn.Linear(50, 1)
+        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 128)
+        self.l2 = nn.Linear(128 , 64)
+        self.l3 = nn.Linear(64 , 16)
+        self.l4 = nn.Linear(16, 1)
 
     def forward(self, x, u):
         x = F.relu(self.l1(torch.cat([x, u], 1)))
@@ -206,7 +206,7 @@ class DDPG(object):
                 self.writer.add_scalar('Loss/critic_loss', critic_loss, global_step=self.num_critic_update_iteration)
                 
                 # Optimize the critic
-                self.critic_optimizer.zero_grad() # 梯度清楚初始化，使得batch梯度不积累
+                self.critic_optimizer.zero_grad() # 梯度初始化，使得batch梯度不积累
                 critic_loss.backward() # 损失反向传播
                 self.critic_optimizer.step() # 更新
 
@@ -215,7 +215,7 @@ class DDPG(object):
                 self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
 
                 # Optimize the actor
-                self.actor_optimizer.zero_grad() # # 梯度清楚初始化，使得batch梯度不积累
+                self.actor_optimizer.zero_grad() # # 梯度初始化，使得batch梯度不积累
                 actor_loss.backward() # 损失反向传播
                 self.actor_optimizer.step() # 更新
 
@@ -300,8 +300,8 @@ def main():
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
                     
-                    ego_total_reward = ego_reward
-                    npc_total_reward = npc_reward
+                    ego_total_reward += ego_reward
+                    npc_total_reward += npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
@@ -313,8 +313,8 @@ def main():
                     ego_state = ego_next_state
                     npc_state = npc_next_state
 
-                # ego_total_reward /= t
-                # npc_total_reward /= t
+                ego_total_reward /= t
+                npc_total_reward /= t
                 print("Episode: {} step: {} ego Total Reward: {:0.3f} npc Total Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 ego_reward_list.append(ego_total_reward)
                 
@@ -400,20 +400,20 @@ def main():
                     ego_state = ego_next_state
                     npc_state = npc_next_state
                     
-                    ego_total_reward = ego_reward
-                    npc_total_reward = npc_reward
+                    ego_total_reward += ego_reward
+                    npc_total_reward += npc_reward
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
                     if ego_done and npc_done: # 结束条件
                         break
 
-                # ego_total_reward /= t
-                # npc_total_reward /= t
+                ego_total_reward /= t
+                npc_total_reward /= t
                 ego_reward_list.append(ego_total_reward)
                 npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                ego_DDPG.update(curr_epi=i)
+                # ego_DDPG.update(curr_epi=i)
                 npc_DDPG.update(curr_epi=i)
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
