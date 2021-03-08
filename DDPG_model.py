@@ -38,7 +38,7 @@ parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
@@ -48,13 +48,13 @@ parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.01, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.02, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.4, type=float) # 探索偏移分布 
+parser.add_argument('--exploration_noise', default=0.6, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
@@ -195,7 +195,7 @@ class DDPG(object):
                 reward = torch.FloatTensor(r).to(device)
 
                 # Compute the target Q value
-                target_Q = self.critic_target(next_state, next_action)
+                target_Q = self.critic_target(next_state, next_action.detach())
                 target_Q = reward + (done * args.gamma * target_Q).detach()
 
                 # Get current Q estimate
@@ -305,9 +305,7 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done: # ego结束条件ego_done
-                        break
-                    if npc_done: # npc结束条件npc_done
+                    if ego_done or npc_done: # 结束条件
                         break
                     # period = time.time() - start_time                    
                     ego_state = ego_next_state
@@ -394,8 +392,8 @@ def main():
                     # 数据储存
                     ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
                         np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
-                    npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
-                        np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
+                    # npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
+                    #     np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
@@ -405,16 +403,16 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done and npc_done: # 结束条件
+                    if ego_done or npc_done: # 结束条件
                         break
 
-                ego_total_reward /= t
-                npc_total_reward /= t
+                # ego_total_reward /= t
+                # npc_total_reward /= t
                 ego_reward_list.append(ego_total_reward)
                 npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                # ego_DDPG.update(curr_epi=i)
-                npc_DDPG.update(curr_epi=i)
+                ego_DDPG.update(curr_epi=i)
+                # npc_DDPG.update(curr_epi=i)
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')
