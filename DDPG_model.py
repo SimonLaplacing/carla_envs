@@ -41,7 +41,7 @@ parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
+parser.add_argument('--gamma', default=0.97, type=int) # discounted factor
 parser.add_argument('--capacity', default=20000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 
@@ -56,7 +56,7 @@ parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--exploration_noise', default=0.6, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 4, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -186,7 +186,7 @@ class DDPG(object):
             for it in range(args.update_iteration):
                 # Sample replay buffer
                 x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、下个动作、奖励、是否结束标志
-
+                print('length is ',len(x))
                 state = torch.FloatTensor(x).to(device)
                 action = torch.FloatTensor(u).to(device)
                 next_state = torch.FloatTensor(y).to(device)
@@ -390,10 +390,10 @@ def main():
                     ego_next_action = ego_DDPG.select_next_action(np.concatenate((ego_next_state, npc_next_state)))
                     npc_next_action = npc_DDPG.select_next_action(np.concatenate((npc_next_state, ego_next_state)))
                     # 数据储存
-                    ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
-                        np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
-                    # npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
-                    #     np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
+                    # ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
+                    #     np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
+                    npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
+                        np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
@@ -403,7 +403,7 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done or npc_done: # 结束条件
+                    if ego_done and npc_done: # 结束条件
                         break
 
                 # ego_total_reward /= t
@@ -411,8 +411,8 @@ def main():
                 ego_reward_list.append(ego_total_reward)
                 npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                ego_DDPG.update(curr_epi=i)
-                # npc_DDPG.update(curr_epi=i)
+                # ego_DDPG.update(curr_epi=i)
+                npc_DDPG.update(curr_epi=i)
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')
