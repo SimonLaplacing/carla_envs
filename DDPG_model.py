@@ -35,22 +35,23 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
-parser.add_argument('--target_update_interval', default=4, type=int) # 目标网络更新间隔
+parser.add_argument('--update_interval', default=4, type=int) # 目标网络更新间隔
+parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.97, type=int) # discounted factor
-parser.add_argument('--capacity', default=20000, type=int) # replay buffer size
+parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
+parser.add_argument('--capacity', default=40000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.02, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
@@ -117,6 +118,22 @@ class Replay_buffer():
 
         return np.array(x), np.array(y), np.array(u), np.array(uy), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
 
+class OrnsteinUhlenbeckActionNoise():
+    def __init__(self, mu=0, sigma=2, theta=0.05, dt=1e-2, x0=None):
+        self.theta = theta
+        self.mu = mu
+        self.sigma = sigma
+        self.dt = dt
+        self.x0 = x0
+        self.reset()
+
+    def __call__(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
+        self.x_prev = x
+        return x
+
+    def reset(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
@@ -186,7 +203,6 @@ class DDPG(object):
             for it in range(args.update_iteration):
                 # Sample replay buffer
                 x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、下个动作、奖励、是否结束标志
-                print('length is ',len(x))
                 state = torch.FloatTensor(x).to(device)
                 action = torch.FloatTensor(u).to(device)
                 next_state = torch.FloatTensor(y).to(device)
@@ -333,6 +349,8 @@ def main():
         elif args.mode == 'train':
             if args.load: ego_DDPG.load('ego')
             if args.load: npc_DDPG.load('npc')
+            OU = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=np.array([1,1]))
+            noise = OU.__call__()
             for i in range(args.max_episode):
                 ego_total_reward = 0
                 npc_total_reward = 0
@@ -369,10 +387,13 @@ def main():
                     else:
                         noise = args.exploration_noise*0.25
                         c_tau = args.c_tau
-                    ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
-                        min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
-                        min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    
+                    # ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
+                    #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    # npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
+                    #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    ego_action = np.array(ego_action + noise).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = np.array(npc_action + noise).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
                     create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
@@ -390,8 +411,8 @@ def main():
                     ego_next_action = ego_DDPG.select_next_action(np.concatenate((ego_next_state, npc_next_state)))
                     npc_next_action = npc_DDPG.select_next_action(np.concatenate((npc_next_state, ego_next_state)))
                     # 数据储存
-                    # ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
-                    #     np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
+                    ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
+                        np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
                     npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
                         np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
@@ -411,8 +432,9 @@ def main():
                 ego_reward_list.append(ego_total_reward)
                 npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                # ego_DDPG.update(curr_epi=i)
-                npc_DDPG.update(curr_epi=i)
+                if i % args.update_interval == 0:
+                    ego_DDPG.update(curr_epi=i)
+                    npc_DDPG.update(curr_epi=i)
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')
