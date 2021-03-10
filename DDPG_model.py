@@ -39,25 +39,25 @@ parser.add_argument('--update_interval', default=4, type=int) # 目标网络更�
 parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
-parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
+parser.add_argument('--max_length_of_trajectory', default=150, type=int) # 最大仿真步数
+parser.add_argument('--Alearning_rate', default=1e-3, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=40000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
-parser.add_argument('--synchronous_mode', default=False, type=bool) # 同步模式开关
+parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
-parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
-parser.add_argument('--exploration_noise', default=0.6, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 4, type=int) # 网络迭代次数
+parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
+parser.add_argument('--sigma', default=0.4, type=float) # 探索偏移分布 
+parser.add_argument('--max_episode', default=500, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -197,7 +197,7 @@ class DDPG(object):
         next_state = torch.FloatTensor(next_state.reshape(1, -1)).to(device)
         return self.actor_target(next_state).cpu().data.numpy().flatten()
 
-    def update(self,curr_epi):
+    def update(self,curr_epi,vehicle):
 
         if curr_epi > args.warmup_step:
             for it in range(args.update_iteration):
@@ -219,7 +219,7 @@ class DDPG(object):
 
                 # Compute critic loss
                 critic_loss = F.mse_loss(current_Q, target_Q)
-                self.writer.add_scalar('Loss/critic_loss', critic_loss, global_step=self.num_critic_update_iteration)
+                self.writer.add_scalar('Loss/%s_critic_loss'%vehicle, critic_loss, global_step=self.num_critic_update_iteration)
                 
                 # Optimize the critic
                 self.critic_optimizer.zero_grad() # 梯度初始化，使得batch梯度不积累
@@ -227,8 +227,8 @@ class DDPG(object):
                 self.critic_optimizer.step() # 更新
 
                 # Compute actor loss
-                actor_loss = -self.critic(state, action).mean()
-                self.writer.add_scalar('Loss/actor_loss', actor_loss, global_step=self.num_actor_update_iteration)
+                actor_loss = -1*self.critic(state, action).mean()
+                self.writer.add_scalar('Loss/%s_actor_loss'%vehicle, actor_loss, global_step=self.num_actor_update_iteration)
 
                 # Optimize the actor
                 self.actor_optimizer.zero_grad() # # 梯度初始化，使得batch梯度不积累
@@ -349,13 +349,14 @@ def main():
         elif args.mode == 'train':
             if args.load: ego_DDPG.load('ego')
             if args.load: npc_DDPG.load('npc')
-            OU = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=np.array([1,1]))
-            noise = OU.__call__()
             for i in range(args.max_episode):
                 ego_total_reward = 0
                 npc_total_reward = 0
                 print('------------%dth time learning begins-----------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
+
+                noise1 = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=args.sigma,theta=0.15)
+                noise2 = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=args.sigma,theta=0.15)
 
                 ego_transform = ego_list[0].get_transform()
                 npc_transform = npc_list[0].get_transform()
@@ -376,24 +377,24 @@ def main():
                     npc_action = npc_DDPG.select_action(np.concatenate((npc_state, ego_state)))
                     # 探索偏差调节（先高后低）：
                     if i<=args.max_episode/4:
-                        noise = args.exploration_noise
+                        b = 1
                         c_tau = args.c_tau
                     elif i<=args.max_episode/2:
-                        noise = args.exploration_noise*0.75
+                        b = 0.75
                         c_tau = args.c_tau
                     elif i<=args.max_episode*0.75:
-                        noise = args.exploration_noise*0.5
+                        b = 0.5
                         c_tau = args.c_tau
                     else:
-                        noise = args.exploration_noise*0.25
+                        b = 0.25
                         c_tau = args.c_tau
                     
                     # ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                     #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                     #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    ego_action = np.array(ego_action + noise).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    npc_action = np.array(npc_action + noise).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    ego_action = np.array(ego_action + noise1()*b).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = np.array(npc_action + noise2()*b).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
                     create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
@@ -424,7 +425,7 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done and npc_done: # 结束条件
+                    if ego_done or npc_done: # 结束条件
                         break
 
                 # ego_total_reward /= t
@@ -433,8 +434,8 @@ def main():
                 npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 if i % args.update_interval == 0:
-                    ego_DDPG.update(curr_epi=i)
-                    npc_DDPG.update(curr_epi=i)
+                    ego_DDPG.update(curr_epi=i,vehicle='ego')
+                    npc_DDPG.update(curr_epi=i,vehicle='npc')
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
                     npc_DDPG.save('npc')
