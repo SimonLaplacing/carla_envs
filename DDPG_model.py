@@ -37,13 +37,13 @@ parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新�
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--update_interval', default=4, type=int) # 目标网络更新间隔
 parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
-parser.add_argument('--warmup_step', default=8, type=int) # 网络参数训练更新预备回合数
+parser.add_argument('--warmup_step', default=5, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=10, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=150, type=int) # 最大仿真步数
-parser.add_argument('--Alearning_rate', default=1e-3, type=float) # Actor学习率
+parser.add_argument('--Alearning_rate', default=2e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=100000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=50000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=128, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -55,9 +55,9 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 目标网络保存间隔
 parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
-parser.add_argument('--sigma', default=0.4, type=float) # 探索偏移分布 
+parser.add_argument('--sigma', default=0.3, type=float) # 探索偏移分布 
 parser.add_argument('--max_episode', default=500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 6, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -119,7 +119,7 @@ class Replay_buffer():
         return np.array(x), np.array(y), np.array(u), np.array(uy), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
 
 class OrnsteinUhlenbeckActionNoise():
-    def __init__(self, mu=0, sigma=2, theta=0.05, dt=1e-2, x0=None):
+    def __init__(self, mu=np.zeros(action_dim), sigma=1, theta=0.05, dt=1e-2, x0=None):
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
@@ -355,8 +355,8 @@ def main():
                 print('------------%dth time learning begins-----------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
-                noise1 = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=args.sigma,theta=0.15)
-                noise2 = OrnsteinUhlenbeckActionNoise(mu=np.array([0,0]),sigma=args.sigma,theta=0.15)
+                noise1 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.15)
+                noise2 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.15)
 
                 ego_transform = ego_list[0].get_transform()
                 npc_transform = npc_list[0].get_transform()
