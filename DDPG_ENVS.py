@@ -127,10 +127,10 @@ class Create_Envs(object):
             npc_steer = c_tau*npc_steer + (1-c_tau)*npc.get_control().steer
             if ego_move >= 0:
                 ego_throttle = c_tau*ego_move + (1-c_tau)*ego.get_control().throttle
-                ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
+                ego_control = carla.VehicleControl(throttle = ego_throttle, steer = 0*ego_steer, brake = 0)
             elif ego_move < 0:
                 ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
-                ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
+                ego_control = carla.VehicleControl(throttle = 0, steer = 0*ego_steer, brake = 0.5*ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
                 npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
@@ -165,10 +165,10 @@ class Create_Envs(object):
         npc_inv = npc_sensor[1].get_invasion_history()
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
          
-        eb=-80 if ego_velocity < 0 else 0
-        nb=-80 if npc_velocity < 0 else 0
-        ego_reward = (-100)*ego_col[0] + (-0)*(14-ego_velocity) + (-1)*ego_acceleration + (20)*(ego_next_transform.location.x-120)/125 + eb
-        npc_reward = (-100)*npc_col[0] + (-0)*(14-npc_velocity) + (0)*npc_acceleration + (20)*(npc_next_transform.location.x-120)/125 + nb
+        eb=0 if ego_velocity <= 0 else 0
+        nb=0 if npc_velocity <= 0 else 0
+        ego_reward = (-10)*ego_col[0] + (-0)*(14-ego_velocity) + (0)*ego_acceleration + (4)*(ego_next_transform.location.x-120)/125 + eb
+        npc_reward = (-10)*npc_col[0] + (-0)*(14-npc_velocity) + (0)*npc_acceleration + (4)*(npc_next_transform.location.x-120)/125 + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 

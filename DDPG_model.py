@@ -32,8 +32,8 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--tau',  default=0.005, type=float) # 目标网络软更新系数
+parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--update_interval', default=4, type=int) # 网络更新间隔
 parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
@@ -56,8 +56,8 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--sigma', default=0.8, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 6, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -198,7 +198,6 @@ class DDPG(object):
         return self.actor_target(next_state).cpu().data.numpy().flatten()
 
     def update(self,curr_epi,vehicle):
-
         if curr_epi > args.warmup_step:
             for it in range(args.update_iteration):
                 # Sample replay buffer
@@ -211,28 +210,28 @@ class DDPG(object):
                 reward = torch.FloatTensor(r)
 
                 # Compute the target Q value
-                target_Q = self.critic_target(next_state, next_action.detach())
-                target_Q = reward + (done * args.gamma * target_Q).detach()
+                target_Q = self.critic_target(next_state, next_action)
+                target_Q = reward + (done * args.gamma * target_Q)
 
                 # Get current Q estimate
                 current_Q = self.critic(state, action)
 
                 # Compute critic loss
+                self.critic_optimizer.zero_grad() # 梯度初始化，使得batch梯度不积累
                 critic_loss = F.mse_loss(current_Q, target_Q)
                 self.writer.add_scalar('Loss/%s_critic_loss'%vehicle, critic_loss, global_step=self.num_critic_update_iteration)
                 
                 # Optimize the critic
-                self.critic_optimizer.zero_grad() # 梯度初始化，使得batch梯度不积累
-                critic_loss.backward() # 损失反向传播
+                critic_loss.backward() # 计算梯度
                 self.critic_optimizer.step() # 更新
 
                 # Compute actor loss
-                actor_loss = -1*self.critic_target(next_state, next_action.detach()).mean()
+                self.actor_optimizer.zero_grad() # # 梯度初始化，使得batch梯度不积累
+                actor_loss = -1*self.critic(state, action).mean()
                 self.writer.add_scalar('Loss/%s_actor_loss'%vehicle, actor_loss, global_step=self.num_actor_update_iteration)
 
                 # Optimize the actor
-                self.actor_optimizer.zero_grad() # # 梯度初始化，使得batch梯度不积累
-                actor_loss.backward() # 损失反向传播
+                actor_loss.backward() # 计算梯度
                 self.actor_optimizer.step() # 更新
 
                 # Update the frozen target models
@@ -483,19 +482,6 @@ def main():
             # if x.is_alive:
             client.apply_batch([carla.command.DestroyActor(x)])
         print('all clean, simulation done!')
-
-        # reward图
-        # x1=np.arange(len(ego_reward_list))
-        # y1=ego_reward_list
-        # x2=np.arange(len(npc_reward_list))
-        # y2=npc_reward_list
-        # plt.figure(figsize=(8,8), dpi=80)
-        # plt.figure(1)
-        # ax1 = plt.subplot(211)
-        # ax1.plot(x1,y1)
-        # ax2 = plt.subplot(212)
-        # ax2.plot(x2,y2)
-        # plt.show()
 
 
 if __name__ == '__main__':
