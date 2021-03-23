@@ -418,8 +418,8 @@ def main():
                     # 数据储存
                     ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
                         np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
-                    # npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
-                    #     np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
+                    npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
+                        np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
@@ -441,10 +441,10 @@ def main():
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 if i % args.update_interval == 0:
                     ego_DDPG.update(curr_epi=i,vehicle='ego')
-                    # npc_DDPG.update(curr_epi=i,vehicle='npc')
+                    npc_DDPG.update(curr_epi=i,vehicle='npc')
                 if i % args.log_interval == 0:
                     ego_DDPG.save('ego')
-                    # npc_DDPG.save('npc')
+                    npc_DDPG.save('npc')
 
                 for x in sensor_list[0]:
                     if x.sensor.is_alive:

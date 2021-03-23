@@ -119,7 +119,7 @@ class Create_Envs(object):
             ego.set_target_velocity(ego_target_speed)
             npc.set_target_velocity(npc_target_speed)
             print('target velocity is set!')
-            time.sleep(1.5*sim_time)
+            time.sleep(1*sim_time)
         else: 
             ego_move,ego_steer = ego_action
             npc_move,npc_steer = npc_action
@@ -130,7 +130,7 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = ego_throttle, steer = 0*ego_steer, brake = 0)
             elif ego_move < 0:
                 ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
-                ego_control = carla.VehicleControl(throttle = 0, steer = 0*ego_steer, brake = 0.5*ego_brake)
+                ego_control = carla.VehicleControl(throttle = 0, steer = 0*ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
                 npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
@@ -138,7 +138,7 @@ class Create_Envs(object):
                 npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
                 npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
             ego.apply_control(ego_control)
-            # npc.apply_control(npc_control)
+            npc.apply_control(npc_control)
             # time.sleep(sim_time)
             print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
