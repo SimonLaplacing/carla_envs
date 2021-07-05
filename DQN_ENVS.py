@@ -20,7 +20,7 @@ import copy
 import Simple_Sensors as SS
 
 class Create_Envs(object):
-    def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
+    def __init__(self,synchronous_mode = False,no_rendering_mode = True,fixed_delta_seconds = 0.05):
         self.synchronous_mode = synchronous_mode
         self.no_rendering_mode = no_rendering_mode
         self.fixed_delta_seconds = fixed_delta_seconds
@@ -32,6 +32,11 @@ class Create_Envs(object):
 
         # 连接世界
         world = client.load_world('Town04')
+        settings = world.get_settings()
+        settings.synchronous_mode = self.synchronous_mode
+        settings.no_rendering_mode = self.no_rendering_mode
+        settings.fixed_delta_seconds = self.fixed_delta_seconds
+        world.apply_settings(settings)
 
         # 蓝图
         blueprint_library = world.get_blueprint_library()
@@ -166,11 +171,11 @@ class Create_Envs(object):
 
     def get_reward(self,action):  
         if action == [0,1]:
-            reward = -100
+            reward = -20
         elif action == [0,0]:
             reward = 4
         elif action == [1,1]:
-            reward = 4
+            reward = 2
         else:
-            reward = -100
+            reward = -10
         return reward
