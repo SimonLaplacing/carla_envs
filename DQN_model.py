@@ -25,10 +25,10 @@ import carla
 
 # hyper-parameters
 parser = argparse.ArgumentParser()
-parser.add_argument('--episodes', default = 1000, type=int)
+parser.add_argument('--episodes', default = 1500, type=int)
 parser.add_argument('--MEMORY_CAPACITY', default = 20000, type=int)
 parser.add_argument('--BATCH_SIZE', default = 32, type=int)
-parser.add_argument('--LR', default = 1e-3, type=float)
+parser.add_argument('--LR', default = 1e-4, type=float)
 parser.add_argument('--GAMMA', default = 0.9, type=float) 
 parser.add_argument('--EPISILO', default = 0.9, type=float) # greedy
 
