@@ -171,11 +171,11 @@ class Create_Envs(object):
 
     def get_reward(self,action):  
         if action == [0,1]:
-            reward = -20
+            reward1,reward2 = 1,4
         elif action == [0,0]:
-            reward = 4
+            reward1,reward2 = 1,1
         elif action == [1,1]:
-            reward = 2
+            reward1,reward2 = -20,-20
         else:
-            reward = -10
-        return reward
+            reward1,reward2 = 4,1
+        return reward1,reward2
