@@ -25,7 +25,7 @@ import carla
 
 # hyper-parameters
 parser = argparse.ArgumentParser()
-parser.add_argument('--episodes', default = 1500, type=int)
+parser.add_argument('--episodes', default = 3000, type=int)
 parser.add_argument('--MEMORY_CAPACITY', default = 20000, type=int)
 parser.add_argument('--BATCH_SIZE', default = 32, type=int)
 parser.add_argument('--LR', default = 1e-4, type=float)
@@ -126,7 +126,7 @@ class DQN():
         # q_target = batch_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)
         q_target = batch_reward
         loss = self.loss_func(q_eval, q_target)
-        self.writer.add_scalar('Loss/%s_loss'%vehicle, loss, global_step=self.num_update_iteration)
+        # self.writer.add_scalar('Loss/%s_loss'%vehicle, loss, global_step=self.num_update_iteration)
         self.num_update_iteration += 1
         self.optimizer.zero_grad()
         loss.backward()
@@ -153,18 +153,19 @@ def main():
     main_writer = SummaryWriter(directory)
     client, world, blueprint_library = create_envs.connection()
     print("Collecting Experience....")
-    reward_list = []
+    reward_list1 = []
+    reward_list2 = []
 
     try:
         for i in range(args.episodes):
             print('%dth time learning begins'%i)
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
-            sim_time = 0  # 仿真时间
-            start_time = time.time()  # 初始时间
+            # sim_time = 0  # 仿真时间
+            # start_time = time.time()  # 初始时间
             state = state_space[1]
 
-            egocol_list = sensor_list[0].get_collision_history()
-            npccol_list = sensor_list[1].get_collision_history()
+            # egocol = sensor_list[0].get_collision_history()
+            # npccol = sensor_list[1].get_collision_history()
 
             # adaptive EPISILO
             if i <= 0.5 * args.episodes:
@@ -178,15 +179,16 @@ def main():
 
             action = [int(ego_action),int(npc_action)]
             print('action is',action)
-            reward = create_envs.get_reward(action)
+            reward1,reward2 = create_envs.get_reward(action)
 
-            ego_dqn.store_transition(state_space[1], ego_action, reward, state_space[0])
-            npc_dqn.store_transition(state_space[1], npc_action, reward, state_space[0])
+            ego_dqn.store_transition(state_space[1], ego_action, reward1, state_space[0])
+            npc_dqn.store_transition(state_space[1], npc_action, reward2, state_space[0])
 
-            print('reward of %dth episode is %d'%(i, reward))
-            reward_list.append(reward)
-            main_writer.add_scalar('Reward/reward', reward, global_step=i)
-
+            print('reward of %dth episode is %d,%d'%(i, reward1,reward2))
+            reward_list1.append(reward1)
+            reward_list2.append(reward2)
+            main_writer.add_scalar('Reward/reward1', reward1, global_step=i)
+            main_writer.add_scalar('Reward/reward2', reward2, global_step=i)
             if i > args.warmup_step: 
                 if i % args.update_interval == 0:
                     ego_dqn.learn('ego')
@@ -227,17 +229,21 @@ def main():
 
             print('Reset')
     finally:
-        rew = open(directory + 'reward.txt','w+')
-        rew.write(str(reward_list))
-        rew.close()
-        x = np.linspace(0,len(reward_list),len(reward_list))
+        # rew = open(directory + 'reward.txt','w+')
+        # rew.write(str(reward_list1))
+        # rew.close()
+        x = np.linspace(0,len(reward_list1),len(reward_list1))
         a=[]
-        for i in range(len(reward_list)):
+        b=[]
+        for i in range(len(reward_list1)):
             if i == 0:
-                a.append(reward_list[i])
+                a.append(reward_list1[i])
+                b.append(reward_list2[i])
             else:
-                a.append((reward_list[i]+a[-1]*i)/(i+1))
+                a.append((reward_list1[i]+a[-1]*i)/(i+1))
+                b.append((reward_list2[i]+b[-1]*i)/(i+1))
         plt.plot(x,a)
+        plt.plot(x,b)
         plt.show()
         # 清洗环境
         print('Start Cleaning Envs')

@@ -39,11 +39,11 @@ parser.add_argument('--update_interval', default=4, type=int) # 网络更新间�
 parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=6, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=500, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=30000, type=int) # replay buffer size
+parser.add_argument('--capacity', default=50000, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=32, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
@@ -56,7 +56,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--sigma', default=0.8, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
 args = parser.parse_args()
 
