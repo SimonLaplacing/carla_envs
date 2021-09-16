@@ -32,7 +32,7 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--update_interval', default=4, type=int) # 网络更新间隔

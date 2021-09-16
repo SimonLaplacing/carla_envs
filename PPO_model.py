@@ -4,6 +4,7 @@ import sys
 
 import argparse
 from itertools import count
+from collections import namedtuple
 
 import random
 import numpy as np
@@ -13,10 +14,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import copy
-import DDPG_ENVS
+import PPO_ENVS
 import time
 
 try:
@@ -32,36 +34,39 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 parser.add_argument('--tau',  default=0.01, type=float) # 目标网络软更新系数
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--update_interval', default=4, type=int) # 网络更新间隔
 parser.add_argument('--target_update_interval', default=8, type=int) # 目标网络更新间隔
 parser.add_argument('--warmup_step', default=6, type=int) # 网络参数训练更新预备回合数
 parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=200, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
-parser.add_argument('--capacity', default=30000, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=32, type=int) # mini batch size
+parser.add_argument('--gamma', default=0.98, type=int) # discounted factor
+parser.add_argument('--capacity', default=50, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
 parser.add_argument('--seed', default=False, type=bool) # 随机种子模式
 parser.add_argument('--random_seed', default=1227, type=int) # 种子值
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
 parser.add_argument('--sigma', default=0.8, type=float) # 探索偏移分布 
-parser.add_argument('--max_episode', default=1500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 20, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
+
+Transition = namedtuple('Transition',['state', 'action', 'reward', 'a_log_prob', 'next_state'])
+TrainRecord = namedtuple('TrainRecord',['episode', 'reward'])
 
 # 随机值
 if args.seed:
@@ -70,10 +75,10 @@ if args.seed:
 
 # 环境建立
 if args.mode == 'train':
-    create_envs = DDPG_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
+    create_envs = PPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
     print('==========training mode is activated==========')
 elif args.mode == 'test':
-    create_envs = DDPG_ENVS.Create_Envs(args.synchronous_mode,False,args.fixed_delta_seconds)
+    create_envs = PPO_ENVS.Create_Envs(args.synchronous_mode,False,args.fixed_delta_seconds)
     print('===========testing mode is activated===========')
 else:
     raise NameError("wrong mode!!!")
@@ -87,191 +92,150 @@ actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float()
 min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-DDPG./'
-
-class Replay_buffer():
-
-    def __init__(self, max_size=args.capacity):
-        self.storage = []
-        self.max_size = max_size
-        self.ptr = 0
-
-    def push(self, data):
-        if len(self.storage) == self.max_size:
-            self.storage[int(self.ptr)] = data
-            self.ptr = (self.ptr + 1) % self.max_size
-        else:
-            self.storage.append(data)
-
-    def sample(self, batch_size):
-        ind = np.random.randint(0, len(self.storage), size=batch_size)
-        x, y, u, uy, r, d = [], [], [], [], [], []
-
-        for i in ind:
-            X, Y, U, UY, R, D = self.storage[i]
-            x.append(np.array(X, copy=False))
-            y.append(np.array(Y, copy=False))
-            u.append(np.array(U, copy=False))
-            uy.append(np.array(UY, copy=False))
-            r.append(np.array(R, copy=False))
-            d.append(np.array(D, copy=False))
-
-        return np.array(x), np.array(y), np.array(u), np.array(uy), np.array(r).reshape(-1, 1), np.array(d).reshape(-1, 1)
-
-class OrnsteinUhlenbeckActionNoise():
-    def __init__(self, mu=np.zeros(action_dim), sigma=1, theta=0.05, dt=5e-2, x0=None):
-        self.theta = theta
-        self.mu = mu
-        self.sigma = sigma
-        self.dt = dt
-        self.x0 = x0
-        self.reset()
-
-    def __call__(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
-        self.x_prev = x
-        return x
-
-    def reset(self):
-        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
+directory = './carla-PPO./'
 
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action):
+    def __init__(self):
         super(Actor, self).__init__()
-
-        self.l1 = nn.Linear(state_dim*actor_num, 128)
-        # self.l1.weight.data.normal_(1e-1,1e-1)
-        self.l2 = nn.Linear(128, 64)
-        self.l3 = nn.Linear(64, 16)
-        self.l4 = nn.Linear(16, action_dim)
-        self.max_action = max_action
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128,16)
+        self.mu_head = nn.Linear(16, action_dim)
+        self.sigma_head = nn.Linear(16, action_dim)
 
     def forward(self, x):
-        x = F.relu(self.l1(x))
-        x = F.relu(self.l2(x))
-        x = F.relu(self.l3(x))
-        x = self.max_action * torch.tanh(self.l4(x))
-        return x
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
 
+        mu = F.tanh(self.mu_head(x))
+        sigma = F.relu(self.sigma_head(x)) + 1e-8
+
+        return mu, sigma
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self):
         super(Critic, self).__init__()
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 16)
+        self.state_value= nn.Linear(16, 1)
 
-        self.l1 = nn.Linear((state_dim + action_dim)*actor_num, 128)
-        self.l2 = nn.Linear(128 , 64)
-        self.l3 = nn.Linear(64 , 16)
-        self.l4 = nn.Linear(16, 1)
+    def forward(self, x):
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
+        value = self.state_value(x)
+        return value
 
-    def forward(self, x, u):
-        x = F.relu(self.l1(torch.cat([x, u], 1)))
-        x = F.relu(self.l2(x))
-        x = F.relu(self.l3(x))
-        x = self.l4(x)
-        return x
+class PPO():
+    clip_param = 0.2
+    max_grad_norm = 0.5
 
+    def __init__(self):
+        super(PPO, self).__init__()
+        self.actor_net = Actor().float()
+        self.critic_net = Critic().float()
+        self.buffer = []
+        self.counter = 0
+        self.training_step = 0
 
-class DDPG(object):
-    def __init__(self, state_dim, action_dim, max_action):
-        self.actor = Actor(state_dim, action_dim, max_action)
-        self.actor_target = Actor(state_dim, action_dim, max_action)
-        self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=args.Alearning_rate)
-
-        self.critic = Critic(state_dim, action_dim)
-        self.critic_target = Critic(state_dim, action_dim)
-        self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=args.Clearning_rate)
-        
-        self.replay_buffer = Replay_buffer()
-        self.writer = SummaryWriter(directory)
-
-        self.num_critic_update_iteration = 0
-        self.num_actor_update_iteration = 0
+        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), args.Alearning_rate)
+        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), args.Clearning_rate)
+        if not os.path.exists('../param'):
+            os.makedirs('../param/net_param')
+            os.makedirs('../param/img')
 
     def select_action(self, state):
-        state = torch.FloatTensor(state.reshape(1, -1))
-        return self.actor(state).cpu().data.numpy().flatten()
-    
-    def select_next_action(self, next_state):
-        next_state = torch.FloatTensor(next_state.reshape(1, -1))
-        return self.actor_target(next_state).cpu().data.numpy().flatten()
+        state = torch.from_numpy(state).float()
+        with torch.no_grad():
+            mu, sigma = self.actor_net(state)
+        dist = Normal(mu, sigma)
+        action = dist.sample()
+        action_log_prob = dist.log_prob(action)
+        action = action.clamp(-1, 1)
+        return action, action_log_prob
 
-    def update(self,curr_epi,vehicle):
-        if curr_epi > args.warmup_step:
-            for it in range(args.update_iteration):
-                # Sample replay buffer
-                x, y, u, uy, r, d = self.replay_buffer.sample(args.batch_size) # 状态、下个状态、动作、下个动作、奖励、是否结束标志
-                state = torch.FloatTensor(x)
-                action = torch.FloatTensor(u)
-                next_state = torch.FloatTensor(y)
-                next_action = torch.FloatTensor(uy)
-                done = torch.FloatTensor(1-d)
-                reward = torch.FloatTensor(r)
 
-                # Compute the target Q value
-                target_Q = self.critic_target(next_state, next_action)
-                target_Q = reward + (done * args.gamma * target_Q)
+    def get_value(self, state):
+        state = torch.from_numpy(state)
+        with torch.no_grad():
+            value = self.critic_net(state)
+        return value.item()
 
-                # Get current Q estimate
-                current_Q = self.critic(state, action)
+    def save_param(self):
+        torch.save(self.actor_net.state_dict(), '../param/net_param/actor_net'+str(time.time())[:10],+'.pkl')
+        torch.save(self.critic_net.state_dict(), '../param/net_param/critic_net'+str(time.time())[:10],+'.pkl')
 
-                # Compute critic loss
-                self.critic_optimizer.zero_grad() # 梯度初始化，使得batch梯度不积累
-                critic_loss = F.mse_loss(current_Q, target_Q)
-                self.writer.add_scalar('Loss/%s_critic_loss'%vehicle, critic_loss, global_step=self.num_critic_update_iteration)
+    def store_transition(self, transition):
+        self.buffer.append(transition)
+        self.counter+=1
+        return self.counter % args.capacity == 0
+
+    def update(self):
+        self.training_step +=1
+
+        state = torch.tensor([t.state for t in self.buffer ], dtype=torch.float)
+        action = torch.tensor([t.action for t in self.buffer], dtype=torch.float).view(-1, 1)
+        reward = torch.tensor([t.reward for t in self.buffer], dtype=torch.float).view(-1, 1)
+        next_state = torch.tensor([t.next_state for t in self.buffer], dtype=torch.float)
+        old_action_log_prob = torch.tensor([t.a_log_prob.cpu().detach().numpy() for t in self.buffer], dtype=torch.float)
+
+        reward = (reward - reward.mean())/(reward.std() + 1e-10)
+        with torch.no_grad():
+            target_v = reward + args.gamma * self.critic_net(next_state)
+
+        advantage = (target_v - self.critic_net(state)).detach()
+        for _ in range(args.update_iteration): # iteration ppo_epoch 
+            for index in BatchSampler(SubsetRandomSampler(range(args.capacity)), args.batch_size, True):
+                # epoch iteration, PPO core!!!
+                mu, sigma = self.actor_net(state[index])
+                n = Normal(mu, sigma)
+                action_log_prob = n.log_prob(action[index])
+                # print(action_log_prob,'-----',old_action_log_prob)
+                ratio = torch.exp(action_log_prob - old_action_log_prob[index])
                 
-                # Optimize the critic
-                critic_loss.backward() # 计算梯度
-                self.critic_optimizer.step() # 更新
+                L1 = ratio * advantage[index]
+                L2 = torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param) * advantage[index]
+                action_loss = -torch.min(L1, L2).mean() # MAX->MIN desent
+                self.actor_optimizer.zero_grad()
+                action_loss.backward()
+                nn.utils.clip_grad_norm_(self.actor_net.parameters(), self.max_grad_norm)
+                self.actor_optimizer.step()
 
-                # Compute actor loss
-                self.actor_optimizer.zero_grad() # # 梯度初始化，使得batch梯度不积累
-                actor_loss = -1*self.critic(state, action).mean()
-                self.writer.add_scalar('Loss/%s_actor_loss'%vehicle, actor_loss, global_step=self.num_actor_update_iteration)
+                value_loss = F.smooth_l1_loss(self.critic_net(state[index]), target_v[index])
+                self.critic_net_optimizer.zero_grad()
+                value_loss.backward()
+                nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)
+                self.critic_net_optimizer.step()
 
-                # Optimize the actor
-                actor_loss.backward() # 计算梯度
-                self.actor_optimizer.step() # 更新
+        del self.buffer[:]
 
-                # Update the frozen target models
-                if it % args.target_update_interval == 0:
-                    for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-                        target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+    # def save(self, name):
+    #     # torch.save(self.actor.state_dict(), directory + name + '_actor.pth')
+    #     # torch.save(self.critic.state_dict(), directory + name + '_critic.pth')
+    #     torch.save(self.actor_net.state_dict(), '../param/net_param/actor_net'+str(time.time())[:10],+'.pkl')
+    #     torch.save(self.critic_net.state_dict(), '../param/net_param/critic_net'+str(time.time())[:10],+'.pkl')
+    #     print("====================================")
+    #     print("Model has been saved...")
+    #     print("====================================")
 
-                    for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-                        target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
-
-                self.num_actor_update_iteration += 1
-                self.num_critic_update_iteration += 1
-
-    def save(self, name):
-        torch.save(self.actor.state_dict(), directory + name + '_actor.pth')
-        torch.save(self.critic.state_dict(), directory + name + '_critic.pth')
-        print("====================================")
-        print("Model has been saved...")
-        print("====================================")
-
-    def load(self, name):
-        self.actor.load_state_dict(torch.load(directory + name + '_actor.pth'))
-        self.critic.load_state_dict(torch.load(directory + name + '_critic.pth'))
-        print("====================================")
-        print("model has been loaded...")
-        print("====================================")
+    # def load(self, name):
+    #     self.actor.load_state_dict(torch.load(directory + name + '_actor.pth'))
+    #     self.critic.load_state_dict(torch.load(directory + name + '_critic.pth'))
+    #     print("====================================")
+    #     print("model has been loaded...")
+    #     print("====================================")
 
 def main():
-    ego_DDPG = DDPG(state_dim, action_dim, max_action)
-    npc_DDPG = DDPG(state_dim, action_dim, max_action)
-    sim_time = args.fixed_delta_seconds  # 每步仿真时间
+    ego_PPO = PPO()
+    npc_PPO = PPO()
+    # sim_time = args.fixed_delta_seconds  # 每步仿真时间
     client, world, blueprint_library = create_envs.connection()
-    main_writer = SummaryWriter(directory)
+    # main_writer = SummaryWriter(directory)
     ego_reward_list = []
     npc_reward_list = []
 
     try:
         if args.mode == 'test':
-            ego_DDPG.load('ego')
-            npc_DDPG.load('npc')
+            ego_PPO.load('ego')
+            npc_PPO.load('npc')
             for i in range(args.test_iteration):
                 #---------动作决策----------
                 ego_total_reward = 0
@@ -293,11 +257,11 @@ def main():
                 npcsen_list = sensor_list[1]
 
                 for t in count():
-                    ego_action = ego_DDPG.select_action(np.concatenate((ego_state, npc_state)))
-                    npc_action = npc_DDPG.select_action(np.concatenate((npc_state, ego_state)))
+                    ego_action = ego_PPO.select_action(ego_state)
+                    npc_action = npc_PPO.select_action(npc_state)
 
-                    ego_action = np.array(ego_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
-                    npc_action = np.array(npc_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
+                    # ego_action = np.array(ego_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
+                    # npc_action = np.array(npc_action).clip(min_action.cpu().numpy(), max_action.cpu().numpy())
                     if i<=args.max_episode/3:
                         c_tau = args.c_tau
                     elif i<=args.max_episode/2:
@@ -351,16 +315,16 @@ def main():
                 print('Reset')
 
         elif args.mode == 'train':
-            if args.load: ego_DDPG.load('ego')
-            if args.load: npc_DDPG.load('npc')
+            # if args.load: ego_PPO.load('ego')
+            # if args.load: npc_PPO.load('npc')
             for i in range(args.max_episode):
                 ego_total_reward = 0
                 npc_total_reward = 0
                 print('------------%dth time learning begins-----------'%i)
                 ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
-                noise1 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.5)
-                noise2 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.5)
+                # noise1 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.5)
+                # noise2 = OrnsteinUhlenbeckActionNoise(sigma=args.sigma,theta=0.5)
 
                 ego_transform = ego_list[0].get_transform()
                 npc_transform = npc_list[0].get_transform()
@@ -377,49 +341,38 @@ def main():
 
                 for t in count():
                     #---------动作决策----------
-                    ego_action = ego_DDPG.select_action(np.concatenate((ego_state, npc_state)))
-                    npc_action = npc_DDPG.select_action(np.concatenate((npc_state, ego_state)))
-                    # 探索偏差调节（先高后低）：
-                    if i<=args.max_episode/4:
-                        b = 1
-                        c_tau = args.c_tau
-                    elif i<=args.max_episode/2:
-                        b = 0.75
-                        c_tau = args.c_tau
-                    elif i<=args.max_episode*0.75:
-                        b = 0.5
-                        c_tau = args.c_tau
-                    else:
-                        b = 0.25
-                        c_tau = args.c_tau
+                    ego_action,ego_action_log_prob = ego_PPO.select_action(ego_state)
+                    npc_action,npc_action_log_prob = npc_PPO.select_action(npc_state)
                     
                     # ego_action = np.array(ego_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                     #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
                     # npc_action = np.array(npc_action + np.random.normal(0, args.exploration_noise, size=(action_dim,))).clip(
                     #     min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    ego_action = np.array(ego_action + noise1()*b).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
-                    npc_action = np.array(npc_action + noise2()*b).clip(min_action.cpu().numpy(), max_action.cpu().numpy()) #将输出tensor格式的action，因此转换为numpy格式
+                    ego_action = np.array(ego_action) #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = np.array(npc_action) #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
-                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, c_tau, args.fixed_delta_seconds, t)
+                    create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
                         world.tick() # 客户端主导，tick
-                        # print(world.tick())
+                    #     # print(world.tick())
                     else:
                         world.wait_for_tick() # 服务器主导，tick
                         # world_snapshot = world.wait_for_tick()
                         # print(world_snapshot.frame)
                         # world.on_tick(lambda world_snapshot: func(world_snapshot))
                     ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
+                    ego_trans = Transition(ego_state, ego_action, ego_reward, ego_action_log_prob, ego_next_state)
+                    npc_trans = Transition(npc_state, npc_action, npc_reward, npc_action_log_prob, npc_next_state)
                     # start_time = time.time()  # 开始时间
                     # print('period:',period)
-                    ego_next_action = ego_DDPG.select_next_action(np.concatenate((ego_next_state, npc_next_state)))
-                    npc_next_action = npc_DDPG.select_next_action(np.concatenate((npc_next_state, ego_next_state)))
+                    # ego_next_action = ego_PPO.select_next_action(np.concatenate((ego_next_state, npc_next_state)))
+                    # npc_next_action = npc_PPO.select_next_action(np.concatenate((npc_next_state, ego_next_state)))
                     # 数据储存
-                    ego_DDPG.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
-                        np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
-                    npc_DDPG.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
-                        np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
+                    # ego_PPO.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
+                    #     np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
+                    # npc_PPO.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
+                    #     np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
@@ -429,22 +382,24 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done and npc_done: # 结束条件
+                    if ego_done or npc_done: # 结束条件
                         break
 
                 ego_total_reward /= t
                 npc_total_reward /= t
-                main_writer.add_scalar('reward/ego_reward', ego_total_reward, global_step=i)
-                main_writer.add_scalar('reward/npc_reward', npc_total_reward, global_step=i)
+                # main_writer.add_scalar('reward/ego_reward', ego_total_reward, global_step=i)
+                # main_writer.add_scalar('reward/npc_reward', npc_total_reward, global_step=i)
                 # ego_reward_list.append(ego_total_reward)
                 # npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
-                if i % args.update_interval == 0:
-                    ego_DDPG.update(curr_epi=i,vehicle='ego')
-                    npc_DDPG.update(curr_epi=i,vehicle='npc')
-                if i % args.log_interval == 0:
-                    ego_DDPG.save('ego')
-                    npc_DDPG.save('npc')
+                # if i % args.update_interval == 0:
+                if ego_PPO.store_transition(ego_trans):
+                    ego_PPO.update()
+                if npc_PPO.store_transition(npc_trans):
+                    npc_PPO.update()
+                # if i % args.log_interval == 0:
+                #     ego_PPO.save('ego')
+                #     npc_PPO.save('npc')
 
                 for x in sensor_list[0]:
                     if x.sensor.is_alive:
