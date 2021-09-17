@@ -13,9 +13,7 @@ except IndexError:
 import carla
 from carla import Transform, Location, Rotation
 
-import random
 import time
-import copy
 
 import Simple_Sensors as SS
 
@@ -114,12 +112,12 @@ class Create_Envs(object):
     def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time,step):
         if step == 0:
             # 初始速度设定
-            ego_target_speed = carla.Vector3D(12,0,0)
-            npc_target_speed = carla.Vector3D(14,0,0)
+            ego_target_speed = carla.Vector3D(16.5,0,0)
+            npc_target_speed = carla.Vector3D(20,0,0)
             ego.set_target_velocity(ego_target_speed)
             npc.set_target_velocity(npc_target_speed)
             print('target velocity is set!')
-            time.sleep(1*sim_time)
+            time.sleep(5*sim_time)
         else: 
             ego_move,ego_steer = ego_action
             npc_move,npc_steer = npc_action
@@ -166,12 +164,12 @@ class Create_Envs(object):
         npc_inv = npc_sensor[1].get_invasion_history()
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
          
-        eb=-1 if ego_velocity <= 0 else 1
-        nb=-1 if npc_velocity <= 0 else 1
-        # ego_reward = (-10)*ego_col[0] + (-1)*(14-ego_velocity) + (0)*ego_acceleration + (4)*(ego_next_transform.location.x-120)/125
-        # npc_reward = (-10)*npc_col[0] + (-1)*(14-npc_velocity) + (0)*npc_acceleration + (4)*(npc_next_transform.location.x-120)/125
-        ego_reward = (-20)*ego_col[0] + eb
-        npc_reward = (-20)*npc_col[0] + nb
+        eb=-2 if ego_velocity <= 2 else 0
+        nb=-2 if npc_velocity <= 2 else 0
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + eb
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + nb
+        # ego_reward = (-20)*ego_col[0] + eb
+        # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
