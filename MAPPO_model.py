@@ -50,7 +50,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=5000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -289,6 +289,10 @@ def main():
         plt.scatter(x2,action_list2)
         plt.title('npc_action')
         plt.show()
+
+        a1 = [int(x) for x in action_list1[-100:]]
+        a2 = [int(x) for x in action_list2[-100:]]
+        print('ego:%1f , %1f ; npc:%1f , %1f '%(a1.count(0),a1.count(1),a2.count(0),a2.count(1)))
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:
