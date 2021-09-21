@@ -35,12 +35,10 @@ import carla
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
-parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=250, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.9, type=int) # discounted factor
-parser.add_argument('--capacity', default=100, type=int) # replay buffer size
+parser.add_argument('--Clearning_rate', default=1e-4, type=float) # Critic学习率
+parser.add_argument('--gamma', default=0, type=int) # discounted factor
+parser.add_argument('--capacity', default=50, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
@@ -50,14 +48,14 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=9800, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
 
-Transition = namedtuple('Transition',['state', 'action', 'reward', 'a_log_prob', 'next_state'])
+Transition = namedtuple('Transition',['state', 'action', 'reward', 'a_log_prob'])
 
 # 环境建立
 create_envs = MAPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
@@ -65,7 +63,7 @@ create_envs = MAPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mod
 # 状态、动作空间定义
 action_space = create_envs.get_action_space()
 state_space = create_envs.get_state_space()
-state_dim = len(state_space) - 1
+state_dim = len(state_space)
 action_dim = len(action_space)
 actor_num = 2
 
@@ -108,19 +106,19 @@ class PPO():
         self.training_step = 0
         self.writer = SummaryWriter('../exp')
 
-        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), 1e-3)
-        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), 3e-3)
+        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), args.Alearning_rate)
+        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), args.Clearning_rate)
         if not os.path.exists('../param'):
             os.makedirs('../param/net_param')
             os.makedirs('../param/img')
 
     def select_action(self, state):
-        state = torch.Tensor(state).float().unsqueeze(0)
+        state = torch.from_numpy(state).float().unsqueeze(0)
         with torch.no_grad():
             action_prob = self.actor_net(state)
         c = Categorical(action_prob)
         action = c.sample()
-        return action, action_prob[:,action.item()]
+        return action.item(), action_prob[:, action.item()].item()
 
     def get_value(self, state):
         state = torch.from_numpy(state)
@@ -137,15 +135,14 @@ class PPO():
         self.counter += 1
         return self.counter % args.capacity == 0
 
-
     def update(self):
-        state = torch.tensor([t.state for t in self.buffer], dtype=torch.float).view(-1, 1)
+        state = torch.tensor([t.state for t in self.buffer], dtype=torch.float)
         action = torch.tensor([t.action for t in self.buffer], dtype=torch.long).view(-1, 1)
         reward = [t.reward for t in self.buffer]
         # update: don't need next_state
         #reward = torch.tensor([t.reward for t in self.buffer], dtype=torch.float).view(-1, 1)
         # next_state = torch.tensor([t.next_state for t in self.buffer], dtype=torch.float)
-        old_action_log_prob = torch.tensor([t.a_log_prob for t in self.buffer], dtype=torch.float)
+        old_action_log_prob = torch.tensor([t.a_log_prob for t in self.buffer], dtype=torch.float).view(-1, 1)
 
         R = 0
         Gt = []
@@ -203,8 +200,7 @@ def main():
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             # sim_time = 0  # 仿真时间
             # start_time = time.time()  # 初始时间
-            state = state_space[1]
-
+            state = state_space
             # egocol = sensor_list[0].get_collision_history()
             # npccol = sensor_list[1].get_collision_history()
 
@@ -215,10 +211,8 @@ def main():
             print('action is',action)
             reward1,reward2 = create_envs.get_reward(action)
 
-            ego_trans = Transition(state, action, ego_action_prob, reward1, 1)
-            npc_trans = Transition(state, action, npc_action_prob, reward2, 1)
-            ego_PPO.store_transition(ego_trans)
-            npc_PPO.store_transition(npc_trans)
+            ego_trans = Transition(state, action, ego_action_prob, reward1)
+            npc_trans = Transition(state, action, npc_action_prob, reward2)
 
             print('reward of %dth episode is %d,%d'%(i, reward1,reward2))
             reward_list1.append(reward1)
@@ -267,7 +261,7 @@ def main():
         # rew = open(directory + 'reward.txt','w+')
         # rew.write(str(reward_list1))
         # rew.close()
-        plt.subplot(3,  1,  1)  
+        plt.subplot(2,  1,  1)  
         x = np.linspace(0,len(reward_list1),len(reward_list1))
         a=[]
         b=[]
@@ -278,21 +272,34 @@ def main():
             else:
                 a.append((reward_list1[i]+a[-1]*i)/(i+1))
                 b.append((reward_list2[i]+b[-1]*i)/(i+1))
-        plt.plot(x,a)
-        plt.plot(x,b)
+        plt.plot(x,a,color='blue')
+        plt.plot(x,b,color='red')
         plt.title('reward')
-        plt.subplot(3,  1,  2)
-        x2 = np.linspace(0,len(action_list1),len(action_list1))
-        plt.scatter(x2,action_list1)
-        plt.title('ego_action')
-        plt.subplot(3,  1,  3)
-        plt.scatter(x2,action_list2)
-        plt.title('npc_action')
+        # plt.subplot(3,  1,  2)
+        # x2 = np.linspace(0,len(action_list1),len(action_list1))
+        # plt.scatter(x2,action_list1)
+        # plt.title('ego_action')
+        # plt.subplot(3,  1,  3)
+        # plt.scatter(x2,action_list2)
+        # plt.title('npc_action')
+        
+        a11, a12, a21, a22 = [], [], [], []
+        for i in range(len(action_list1)//100):
+            a1 = [int(x) for x in action_list1[100*i:100*(i+1)-1]]
+            a2 = [int(x) for x in action_list2[100*i:100*(i+1)-1]]
+            a11.append(a1.count(0))
+            a12.append(a1.count(1))
+            a21.append(a2.count(0))
+            a22.append(a2.count(1))
+        plt.subplot(2,  1,  2)
+        x2 = np.linspace(0,len(a11),len(a11))
+        plt.plot(x2,a11)
+        plt.plot(x2,a12)
+        plt.plot(x2,a21)
+        plt.plot(x2,a22)
+        plt.legend(('ego_0','ego_1','npc_0','npc_1'))
+        plt.title('action')
         plt.show()
-
-        a1 = [int(x) for x in action_list1[-100:]]
-        a2 = [int(x) for x in action_list2[-100:]]
-        print('ego:%1f , %1f ; npc:%1f , %1f '%(a1.count(0),a1.count(1),a2.count(0),a2.count(1)))
         # 清洗环境
         print('Start Cleaning Envs')
         for x in sensor_list:

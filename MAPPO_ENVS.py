@@ -162,20 +162,20 @@ class Create_Envs(object):
             npc.apply_control(npc_control)
 
     def get_action_space(self):
-        action_space = np.array([0,1])
+        action_space = np.array([0,1.0])
         return action_space
     
     def get_state_space(self):
-        state_space = np.array([0,1])
+        state_space = np.array([1])
         return state_space
 
     def get_reward(self,action):  
         if action == [0,1]:
-            reward1,reward2 = 1,10
+            reward1,reward2 = -2,2
         elif action == [0,0]:
             reward1,reward2 = 1,1
         elif action == [1,1]:
-            reward1,reward2 = -10,-10
-        else:
-            reward1,reward2 = 4,1
+            reward1,reward2 = -20,-20
+        elif action == [1,0]:
+            reward1,reward2 = 2,-2
         return reward1,reward2
