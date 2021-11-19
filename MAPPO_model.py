@@ -37,19 +37,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=1e-4, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0, type=int) # discounted factor
-parser.add_argument('--capacity', default=50, type=int) # replay buffer size
+parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
+parser.add_argument('--capacity', default=400, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
+parser.add_argument('--envs_create', default=False, type=bool) # 建立环境开关
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
-parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
-parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
+# parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
+# parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=9800, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=15000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 15, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -73,10 +74,12 @@ class Actor(nn.Module):
     def __init__(self):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 128)
-        self.action_head = nn.Linear(128, action_dim)
+        self.fc2 = nn.Linear(128, 32)
+        self.action_head = nn.Linear(32, action_dim)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         action_prob = F.softmax(self.action_head(x), dim=1)
         return action_prob
 
@@ -85,15 +88,17 @@ class Critic(nn.Module):
     def __init__(self):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 128)
-        self.state_value = nn.Linear(128, 1)
+        self.fc2 = nn.Linear(128, 32)
+        self.state_value = nn.Linear(32, 1)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         value = self.state_value(x)
         return value
 
 
-class PPO():
+class PPO(nn.Module):
     clip_param = 0.2
     max_grad_norm = 0.5
 
@@ -113,7 +118,7 @@ class PPO():
             os.makedirs('../param/img')
 
     def select_action(self, state):
-        state = torch.from_numpy(state).float().unsqueeze(0)
+        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
         with torch.no_grad():
             action_prob = self.actor_net(state)
         c = Categorical(action_prob)
@@ -136,20 +141,20 @@ class PPO():
         return self.counter % args.capacity == 0
 
     def update(self):
-        state = torch.tensor([t.state for t in self.buffer], dtype=torch.float)
-        action = torch.tensor([t.action for t in self.buffer], dtype=torch.long).view(-1, 1)
+        state = torch.tensor([t.state for t in self.buffer], dtype=torch.float).to(device)
+        action = torch.tensor([t.action for t in self.buffer], dtype=torch.long).view(-1, 1).to(device)
         reward = [t.reward for t in self.buffer]
         # update: don't need next_state
-        #reward = torch.tensor([t.reward for t in self.buffer], dtype=torch.float).view(-1, 1)
+        # reward = torch.tensor([t.reward for t in self.buffer], dtype=torch.float)
         # next_state = torch.tensor([t.next_state for t in self.buffer], dtype=torch.float)
-        old_action_log_prob = torch.tensor([t.a_log_prob for t in self.buffer], dtype=torch.float).view(-1, 1)
+        old_action_log_prob = torch.tensor([t.a_log_prob for t in self.buffer], dtype=torch.float).view(-1, 1).to(device)
 
         R = 0
         Gt = []
-        for r in reward[::-1]:
+        for r in reward[::-1]: # 返回包含原列表中所有元素的逆序列表
             R = r + args.gamma * R
             Gt.insert(0, R)
-        Gt = torch.tensor(Gt, dtype=torch.float)
+        Gt = torch.tensor(Gt, dtype=torch.float).to(device)
         #print("The agent is updating....")
         for i in range(args.update_iteration):
             for index in BatchSampler(SubsetRandomSampler(range(args.capacity)), args.batch_size, True):
@@ -187,7 +192,10 @@ class PPO():
 def main():
     ego_PPO = PPO()
     npc_PPO = PPO()
-    client, world, blueprint_library = create_envs.connection()
+    ego_PPO.to(device)
+    npc_PPO.to(device)
+    if args.envs_create:
+        client, world, blueprint_library = create_envs.connection()
     main_writer = SummaryWriter(directory)
     reward_list1 = []
     reward_list2 = []
@@ -197,7 +205,8 @@ def main():
     try:
         for i in range(args.max_episode):
             print('%dth time learning begins'%i)
-            ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
+            if args.envs_create:
+                ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             # sim_time = 0  # 仿真时间
             # start_time = time.time()  # 初始时间
             state = state_space
@@ -225,7 +234,7 @@ def main():
                 ego_PPO.update()
             if npc_PPO.store_transition(npc_trans):
                 npc_PPO.update()
-                print('update parameters')            
+                print('parameters updated')            
 
             # time.sleep(1)
             
@@ -242,19 +251,19 @@ def main():
 
             # print(reward)
             # time.sleep(1)
-
-            for x in sensor_list:
-                if x.sensor.is_alive:
-                    x.sensor.destroy()            
-            for x in ego_list:
-                if x.is_alive:
-                    client.apply_batch([carla.command.DestroyActor(x)])
-            for x in npc_list:
-                if x.is_alive:
-                    client.apply_batch([carla.command.DestroyActor(x)])
-            for x in obstacle_list:
-                if x.is_alive:
-                    client.apply_batch([carla.command.DestroyActor(x)])
+            if args.envs_create:
+                for x in sensor_list:
+                    if x.sensor.is_alive:
+                        x.sensor.destroy()            
+                for x in ego_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in npc_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
+                for x in obstacle_list:
+                    if x.is_alive:
+                        client.apply_batch([carla.command.DestroyActor(x)])
 
             print('Reset')
     finally:
@@ -284,9 +293,9 @@ def main():
         # plt.title('npc_action')
         
         a11, a12, a21, a22 = [], [], [], []
-        for i in range(len(action_list1)//100):
-            a1 = [int(x) for x in action_list1[100*i:100*(i+1)-1]]
-            a2 = [int(x) for x in action_list2[100*i:100*(i+1)-1]]
+        for i in range(len(action_list1)//args.capacity):
+            a1 = [int(x) for x in action_list1[args.capacity*i:args.capacity*(i+1)-1]]
+            a2 = [int(x) for x in action_list2[args.capacity*i:args.capacity*(i+1)-1]]
             a11.append(a1.count(0))
             a12.append(a1.count(1))
             a21.append(a2.count(0))
@@ -301,20 +310,21 @@ def main():
         plt.title('action')
         plt.show()
         # 清洗环境
-        print('Start Cleaning Envs')
-        for x in sensor_list:
-            if x.sensor.is_alive:
-                x.sensor.destroy()
-        for x in ego_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in npc_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        for x in obstacle_list:
-            if x.is_alive:
-                client.apply_batch([carla.command.DestroyActor(x)])
-        print('all clean, simulation done!')
+        if args.envs_create:
+            print('Start Cleaning Envs')
+            for x in sensor_list:
+                if x.sensor.is_alive:
+                    x.sensor.destroy()
+            for x in ego_list:
+                if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in npc_list:
+                if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            for x in obstacle_list:
+                if x.is_alive:
+                    client.apply_batch([carla.command.DestroyActor(x)])
+            print('all clean, simulation done!')
 
 
 if __name__ == '__main__':

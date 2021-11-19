@@ -13,9 +13,7 @@ except IndexError:
 import carla
 from carla import Transform, Location, Rotation
 
-import random
 import time
-import copy
 
 import Simple_Sensors as SS
 
@@ -54,8 +52,11 @@ class Create_Envs(object):
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
-        ego_list.append(ego)
-        print('created %s' % ego.type_id)
+        if ego is None:
+                print('ego created failed')
+        else:
+            ego_list.append(ego)
+            print('created %s' % ego.type_id)
 
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
@@ -74,7 +75,7 @@ class Create_Envs(object):
             npc_bp.set_attribute('color', '229,28,0')
             npc = world.try_spawn_actor(npc_bp, npc_transform)
             if npc is None:
-                print('%s npc created failed' % i)
+                print('No.%s npc created failed' % i)
             else:
                 npc_list.append(npc)
                 print('created %s' % npc.type_id)
@@ -171,11 +172,11 @@ class Create_Envs(object):
 
     def get_reward(self,action):  
         if action == [0,1]:
-            reward1,reward2 = -2,2
+            reward1,reward2 = 1,2
         elif action == [0,0]:
             reward1,reward2 = 1,1
         elif action == [1,1]:
-            reward1,reward2 = -20,-20
+            reward1,reward2 = -10,-10
         elif action == [1,0]:
-            reward1,reward2 = 2,-2
+            reward1,reward2 = 2,1
         return reward1,reward2

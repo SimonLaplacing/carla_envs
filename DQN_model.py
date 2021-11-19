@@ -122,7 +122,7 @@ class DQN():
 
         #q_eval
         q_eval = self.eval_net(batch_state).gather(1, batch_action)
-        q_next = self.target_net(batch_next_state).detach()
+        # q_next = self.target_net(batch_next_state).detach()
         # q_target = batch_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)
         q_target = batch_reward
         loss = self.loss_func(q_eval, q_target)

@@ -39,10 +39,10 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=250, type=int) # 最大仿真步数
-parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=1e-3, type=float) # Critic学习率
+parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
+parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.9, type=int) # discounted factor
-parser.add_argument('--capacity', default=100, type=int) # replay buffer size
+parser.add_argument('--capacity', default=200, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
