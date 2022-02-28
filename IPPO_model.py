@@ -47,7 +47,7 @@ parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
@@ -204,6 +204,7 @@ class PPO():
                 self.critic_net_optimizer.step()
 
         del self.buffer[:]
+        self.counter = 0
 
 def main():
     ego_PPO = PPO()
@@ -319,10 +320,8 @@ def main():
                     ego_trans = Transition(ego_state, ego_action, ego_reward, ego_action_log_prob, ego_next_state)
                     npc_trans = Transition(npc_state, npc_action, npc_reward, npc_action_log_prob, npc_next_state)
                     # 数据储存
-                    # ego_PPO.replay_buffer.push((np.concatenate((ego_state, npc_state)), np.concatenate((ego_next_state, npc_next_state)), 
-                    #     np.concatenate((ego_action, npc_action)), np.concatenate((ego_next_action, npc_next_action)), ego_reward, ego_done))
-                    # npc_PPO.replay_buffer.push((np.concatenate((npc_state, ego_state)), np.concatenate((npc_next_state, ego_next_state)), 
-                    #     np.concatenate((npc_action, ego_action)), np.concatenate((npc_next_action, ego_next_action)), npc_reward, npc_done))
+                    bool_ego = ego_PPO.store_transition(ego_trans)
+                    bool_npc = npc_PPO.store_transition(npc_trans)
 
                     ego_state = ego_next_state
                     npc_state = npc_next_state
@@ -343,10 +342,10 @@ def main():
                 # npc_reward_list.append(npc_total_reward)
                 print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
                 # if i % args.update_interval == 0:
-                if ego_PPO.store_transition(ego_trans):
+                if bool_ego:
                     ego_PPO.update()
                     print('ego_updated')
-                if npc_PPO.store_transition(npc_trans):
+                if bool_npc:
                     npc_PPO.update()
                     print('npc_updated')
                 if i % args.log_interval == 0:
