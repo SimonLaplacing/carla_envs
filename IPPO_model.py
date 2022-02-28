@@ -130,9 +130,6 @@ class PPO():
 
         self.actor_optimizer = optim.Adam(self.actor_net.parameters(), args.Alearning_rate)
         self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), args.Clearning_rate)
-        # if not os.path.exists('../param'):
-        #     os.makedirs('../param/net_param')
-        #     os.makedirs('../param/img')
 
     def select_action(self, state):
         state = torch.from_numpy(state).float()
@@ -156,8 +153,8 @@ class PPO():
         torch.save(self.critic_net.state_dict(), directory + name + '_critic.pkl')
 
     def load(self, name):
-        self.actor.load_state_dict(torch.load(directory + name + '_actor.pkl'))
-        self.critic.load_state_dict(torch.load(directory + name + '_critic.pkl'))
+        self.actor_net.load_state_dict(torch.load(directory + name + '_actor.pkl'))
+        self.critic_net.load_state_dict(torch.load(directory + name + '_critic.pkl'))
 
     def store_transition(self, transition):
         self.buffer.append(transition)
@@ -203,7 +200,7 @@ class PPO():
                 nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)
                 self.critic_net_optimizer.step()
 
-        del self.buffer[:]
+        self.buffer = []
         self.counter = 0
 
 def main():
@@ -237,6 +234,8 @@ def main():
                 for t in count():
                     ego_action = ego_PPO.select_action(ego_state)
                     npc_action = npc_PPO.select_action(npc_state)
+                    ego_action = ego_action.numpy() #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = npc_action.numpy() #将输出tensor格式的action，因此转换为numpy格式
                     create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
                     if args.synchronous_mode:
