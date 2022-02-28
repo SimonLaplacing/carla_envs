@@ -41,7 +41,7 @@ parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.9, type=int) # discounted factor
+parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
 parser.add_argument('--capacity', default=200, type=int) # replay buffer size
 parser.add_argument('--batch_size', default=16, type=int) # mini batch size
 
@@ -53,7 +53,7 @@ parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
 parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 12, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -162,7 +162,10 @@ class PPO():
     def store_transition(self, transition):
         self.buffer.append(transition)
         self.counter+=1
-        return self.counter % args.capacity == 0
+        if self.counter > args.capacity:
+            return 1
+        else:
+            return 0
 
     def update(self):
         self.training_step +=1
@@ -299,8 +302,8 @@ def main():
                     ego_action,ego_action_log_prob = ego_PPO.select_action(ego_state)
                     npc_action,npc_action_log_prob = npc_PPO.select_action(npc_state)
                     
-                    ego_action = np.array(ego_action) #将输出tensor格式的action，因此转换为numpy格式
-                    npc_action = np.array(npc_action) #将输出tensor格式的action，因此转换为numpy格式
+                    ego_action = ego_action.numpy() #将输出tensor格式的action，因此转换为numpy格式
+                    npc_action = npc_action.numpy() #将输出tensor格式的action，因此转换为numpy格式
                     # period = time.time() - start_time
                     create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                     #---------和环境交互动作反馈---------
@@ -329,7 +332,7 @@ def main():
 
                     if t >= args.max_length_of_trajectory: # 总结束条件
                         break
-                    if ego_done and npc_done: # 结束条件
+                    if ego_done or npc_done: # 结束条件
                         break
 
                 ego_total_reward /= t

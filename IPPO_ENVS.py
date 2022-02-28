@@ -116,7 +116,7 @@ class Create_Envs(object):
             npc_target_speed = carla.Vector3D(20,0,0)
             ego.set_target_velocity(ego_target_speed)
             npc.set_target_velocity(npc_target_speed)
-            print('target velocity is set!')
+            # print('target velocity is set!')
             time.sleep(5*sim_time)
         else: 
             ego_move,ego_steer = ego_action
@@ -131,10 +131,10 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 # npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0)
+                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 1)
             elif npc_move < 0:
                 # npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0)
+                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 1)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
             # time.sleep(sim_time/5)
@@ -149,7 +149,7 @@ class Create_Envs(object):
         # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
         # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-        time.sleep(0.01)
+        # time.sleep(0.01)
         ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
         npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # 速度、加速度
