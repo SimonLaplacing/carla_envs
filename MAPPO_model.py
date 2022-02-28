@@ -36,10 +36,10 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--Alearning_rate', default=1e-4, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=1e-4, type=float) # Critic学习率
+parser.add_argument('--Clearning_rate', default=5e-4, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
-parser.add_argument('--capacity', default=400, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=16, type=int) # mini batch size
+parser.add_argument('--capacity', default=500, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=32, type=int) # mini batch size
 
 parser.add_argument('--envs_create', default=False, type=bool) # 建立环境开关
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
@@ -49,8 +49,8 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 # parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 # parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=15000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 15, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=50000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -296,10 +296,10 @@ def main():
         for i in range(len(action_list1)//args.capacity):
             a1 = [int(x) for x in action_list1[args.capacity*i:args.capacity*(i+1)-1]]
             a2 = [int(x) for x in action_list2[args.capacity*i:args.capacity*(i+1)-1]]
-            a11.append(a1.count(0))
-            a12.append(a1.count(1))
-            a21.append(a2.count(0))
-            a22.append(a2.count(1))
+            a11.append((a1.count(0))/args.capacity)
+            a12.append((a1.count(1))/args.capacity)
+            a21.append((a2.count(0))/args.capacity)
+            a22.append((a2.count(1))/args.capacity)
         plt.subplot(2,  1,  2)
         x2 = np.linspace(0,len(a11),len(a11))
         plt.plot(x2,a11)

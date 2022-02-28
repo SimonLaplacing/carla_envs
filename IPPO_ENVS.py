@@ -130,11 +130,11 @@ class Create_Envs(object):
                 ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
-                npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
+                # npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
+                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0)
             elif npc_move < 0:
-                npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
+                # npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
+                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 0)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
             # time.sleep(sim_time/5)

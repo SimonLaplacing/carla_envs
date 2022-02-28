@@ -38,7 +38,7 @@ parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'te
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--test_iteration', default=3, type=int) # 测试次数
-parser.add_argument('--max_length_of_trajectory', default=250, type=int) # 最大仿真步数
+parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.9, type=int) # discounted factor
@@ -52,7 +52,7 @@ parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -130,9 +130,9 @@ class PPO():
 
         self.actor_optimizer = optim.Adam(self.actor_net.parameters(), args.Alearning_rate)
         self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), args.Clearning_rate)
-        if not os.path.exists('../param'):
-            os.makedirs('../param/net_param')
-            os.makedirs('../param/img')
+        # if not os.path.exists('../param'):
+        #     os.makedirs('../param/net_param')
+        #     os.makedirs('../param/img')
 
     def select_action(self, state):
         state = torch.from_numpy(state).float()
@@ -151,9 +151,13 @@ class PPO():
             value = self.critic_net(state)
         return value.item()
 
-    def save_param(self):
-        torch.save(self.actor_net.state_dict(), '../param/net_param/actor_net'+str(time.time())[:10],+'.pkl')
-        torch.save(self.critic_net.state_dict(), '../param/net_param/critic_net'+str(time.time())[:10],+'.pkl')
+    def save(self, name):
+        torch.save(self.actor_net.state_dict(), directory + name + '_actor.pkl')
+        torch.save(self.critic_net.state_dict(), directory + name + '_critic.pkl')
+
+    def load(self, name):
+        self.actor.load_state_dict(torch.load(directory + name + '_actor.pkl'))
+        self.critic.load_state_dict(torch.load(directory + name + '_critic.pkl'))
 
     def store_transition(self, transition):
         self.buffer.append(transition)
@@ -197,22 +201,6 @@ class PPO():
                 self.critic_net_optimizer.step()
 
         del self.buffer[:]
-
-    # def save(self, name):
-    #     # torch.save(self.actor.state_dict(), directory + name + '_actor.pth')
-    #     # torch.save(self.critic.state_dict(), directory + name + '_critic.pth')
-    #     torch.save(self.actor_net.state_dict(), '../param/net_param/actor_net'+str(time.time())[:10],+'.pkl')
-    #     torch.save(self.critic_net.state_dict(), '../param/net_param/critic_net'+str(time.time())[:10],+'.pkl')
-    #     print("====================================")
-    #     print("Model has been saved...")
-    #     print("====================================")
-
-    # def load(self, name):
-    #     self.actor.load_state_dict(torch.load(directory + name + '_actor.pth'))
-    #     self.critic.load_state_dict(torch.load(directory + name + '_critic.pth'))
-    #     print("====================================")
-    #     print("model has been loaded...")
-    #     print("====================================")
 
 def main():
     ego_PPO = PPO()
@@ -289,8 +277,8 @@ def main():
                 print('Reset')
 
         elif args.mode == 'train':
-            # if args.load: ego_PPO.load('ego')
-            # if args.load: npc_PPO.load('npc')
+            if args.load: ego_PPO.load('ego')
+            if args.load: npc_PPO.load('npc')
             for i in range(args.max_episode):
                 ego_total_reward = 0
                 npc_total_reward = 0
@@ -358,9 +346,9 @@ def main():
                 if npc_PPO.store_transition(npc_trans):
                     npc_PPO.update()
                     print('npc_updated')
-                # if i % args.log_interval == 0:
-                #     ego_PPO.save('ego')
-                #     npc_PPO.save('npc')
+                if i % args.log_interval == 0:
+                    ego_PPO.save('ego')
+                    npc_PPO.save('npc')
 
                 for x in sensor_list[0]:
                     if x.sensor.is_alive:
