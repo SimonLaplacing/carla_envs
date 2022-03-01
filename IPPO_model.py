@@ -42,18 +42,18 @@ parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最�
 parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
-parser.add_argument('--capacity', default=200, type=int) # replay buffer size
-parser.add_argument('--batch_size', default=16, type=int) # mini batch size
+parser.add_argument('--capacity', default=300, type=int) # replay buffer size
+parser.add_argument('--batch_size', default=32, type=int) # mini batch size
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 12, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -97,7 +97,7 @@ class Actor(nn.Module):
         x = F.leaky_relu(self.fc2(x))
         x = F.leaky_relu(self.fc3(x))
         mu = F.tanh(self.mu_head(x))
-        sigma = F.softplus(self.sigma_head(x))
+        sigma = F.sigmoid(self.sigma_head(x))
 
         return mu, sigma
 
@@ -179,7 +179,7 @@ class PPO():
 
         advantage = (target_v - self.critic_net(state)).detach()
         for _ in range(args.update_iteration): # iteration ppo_epoch 
-            for index in BatchSampler(SubsetRandomSampler(range(args.capacity)), args.batch_size, True):
+            for index in BatchSampler(SubsetRandomSampler(range(args.capacity)), args.batch_size, False):
                 # epoch iteration, PPO core!!!
                 mu, sigma = self.actor_net(state[index])
                 n = Normal(mu, sigma)
