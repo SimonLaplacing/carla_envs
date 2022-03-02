@@ -17,7 +17,7 @@ from torch.distributions import Categorical
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
-import MAPPO_ENVS
+import IPPO2_ENVS
 import time
 
 try:
@@ -59,7 +59,7 @@ script_name = os.path.basename(__file__)
 Transition = namedtuple('Transition',['state', 'action', 'reward', 'a_log_prob'])
 
 # 环境建立
-create_envs = MAPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
+create_envs = IPPO2_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
 
 # 状态、动作空间定义
 action_space = create_envs.get_action_space()
@@ -68,7 +68,7 @@ state_dim = len(state_space)
 action_dim = len(action_space)
 actor_num = 2
 
-directory = './carla-MAPPO./'
+directory = './carla-IPPO2./'
 
 class Actor(nn.Module):
     def __init__(self):

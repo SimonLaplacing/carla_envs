@@ -115,9 +115,9 @@ class Create_Envs(object):
             ego_target_speed = carla.Vector3D(16.5,0,0)
             npc_target_speed = carla.Vector3D(20,0,0)
             ego.set_target_velocity(ego_target_speed)
-            npc.set_target_velocity(npc_target_speed)
+            # npc.set_target_velocity(npc_target_speed)
             # print('target velocity is set!')
-            time.sleep(5*sim_time)
+
         else: 
             ego_move,ego_steer = ego_action
             npc_move,npc_steer = npc_action
@@ -137,7 +137,7 @@ class Create_Envs(object):
                 npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = 1)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
-            # time.sleep(sim_time/5)
+
             print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
@@ -149,9 +149,9 @@ class Create_Envs(object):
         # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
         # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-        # time.sleep(0.01)
-        ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-        npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
+
+        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
+        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
@@ -164,16 +164,15 @@ class Create_Envs(object):
         npc_inv = npc_sensor[1].get_invasion_history()
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
          
-        eb=-2 if ego_velocity <= 2 else 0
-        nb=-2 if npc_velocity <= 2 else 0
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (0)*(ego_next_transform.location.x-200)/125
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (0)*(npc_next_transform.location.x-200)/125
+        eb=-0.5 if ego_velocity <= 2 else 0
+
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + eb
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + eb
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
-        # ego_inv[-1]
         # done结束状态判断
         if ego_col[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
             ego_done = True
