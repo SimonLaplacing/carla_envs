@@ -33,7 +33,7 @@ parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.98, type=int) # discounted factor
+parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
@@ -43,8 +43,8 @@ parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=1700, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -89,15 +89,17 @@ def main():
 
             ego_transform = ego_list[0].get_transform()
             npc_transform = npc_list[0].get_transform()
-            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90])
-            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90])
+            ego_velocity = ego_list[0].get_velocity().x
+            npc_velocity = npc_list[0].get_velocity().x
+            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
+            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
 
             egosen_list = sensor_list[0]
             npcsen_list = sensor_list[1]
 
-            if (i+1) % int(200) == 0:
-                    ego_PPO.decay_action_std(0.05, 0.1)
-                    npc_PPO.decay_action_std(0.05, 0.1)
+            # if (i+1) % int(200) == 0:
+            #         ego_PPO.decay_action_std(0.05, 0.1)
+            #         npc_PPO.decay_action_std(0.05, 0.1)
 
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
@@ -113,7 +115,7 @@ def main():
                 else:
                     world.wait_for_tick() # 服务器主导，tick
 
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list)
+                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
 
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
@@ -138,14 +140,15 @@ def main():
             print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
             
             if args.mode == 'train':    
-                if i+1 % args.update_interval == 0:
+                if i > 0 and (i+1) % args.update_interval == 0:
                     ego_PPO.update()
                     print('ego_updated')
-                    npc_PPO.update()
-                    print('npc_updated')
-                if i+1 % args.log_interval == 0:
+                    # npc_PPO.update()
+                    # print('npc_updated')
+                if i > 0 and (i+1) % args.log_interval == 0:
                     ego_PPO.save(directory + 'ego.pkl')
                     npc_PPO.save(directory + 'npc.pkl')
+                    print('Network Saved')
 
             for x in sensor_list[0]:
                 if x.sensor.is_alive:

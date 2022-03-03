@@ -142,32 +142,33 @@ class Create_Envs(object):
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor):
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor, step):
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
         # ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
         # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
         # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-
-        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
-        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
         # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
+
+        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
+        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
+        
         ego_acceleration = abs(ego.get_acceleration().y)
         npc_acceleration = abs(npc.get_acceleration().y)
         # 碰撞、变道检测
         ego_col = ego_sensor[0].get_collision_history()
         npc_col = npc_sensor[0].get_collision_history()
-        ego_inv = ego_sensor[1].get_invasion_history()
-        npc_inv = npc_sensor[1].get_invasion_history()
+        # ego_inv = ego_sensor[1].get_invasion_history()
+        # npc_inv = npc_sensor[1].get_invasion_history()
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚
          
         eb=-0.5 if ego_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + eb
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + eb
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + eb + step/100
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + eb + step/100
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
@@ -191,5 +192,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0] # ego_x,y,yaw;npc_x,y,yaw
+        state_space = [0,0,0,0] # ego_x,y,yaw;npc_x,y,yaw,velocity
         return state_space
