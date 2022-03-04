@@ -115,8 +115,8 @@ class Create_Envs(object):
             ego_target_speed = carla.Vector3D(16.5,0,0)
             npc_target_speed = carla.Vector3D(20,0,0)
             ego.set_target_velocity(ego_target_speed)
-            # npc.set_target_velocity(npc_target_speed)
-            # print('target velocity is set!')
+            npc.set_target_velocity(npc_target_speed)
+            print('target velocity is set!')
 
         else: 
             ego_move,ego_steer = ego_action
