@@ -40,9 +40,9 @@ parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
-parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
+parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=1700, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -90,8 +90,11 @@ def main():
             npc_transform = npc_list[0].get_transform()
             ego_velocity = ego_list[0].get_velocity().x
             npc_velocity = npc_list[0].get_velocity().x
-            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
-            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
+            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25, 
+                (npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
+
+            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25, 
+                (ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
 
             egosen_list = sensor_list[0]
             npcsen_list = sensor_list[1]

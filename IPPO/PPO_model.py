@@ -132,6 +132,27 @@ class ActorCritic(nn.Module):
         action_logprob = dist.log_prob(action)
         
         return action.detach(), action_logprob.detach()
+
+    def act_best(self, state):
+        if self.has_continuous_action_space:
+            action_mean, action_sigma = self.actor(state)
+            action = action_mean
+            action_var = action_sigma ** 2
+            # action_var = torch.full((self.action_dim,), 0.6).to(device)
+            action_var = action_var.repeat(1,2).to(device)
+            cov_mat = torch.diag_embed(action_var).to(device)
+            # cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            dist = MultivariateNormal(action_mean, cov_mat)
+        else:
+            action_probs = self.actor(state)
+            action = torch.argmax(action_probs)
+            dist = Categorical(action_probs)
+
+        # action = dist.sample()
+        action = action.clamp(-1, 1)
+        action_logprob = dist.log_prob(action)
+        
+        return action.detach(), action_logprob.detach()
     
     def evaluate(self, state, action):
 
@@ -213,6 +234,29 @@ class PPO:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
                 action, action_logprob = self.policy_old.act(state)
+
+            self.buffer.states.append(state)
+            self.buffer.actions.append(action)
+            self.buffer.logprobs.append(action_logprob)
+
+            return action.detach().cpu().numpy().flatten()
+        else:
+            with torch.no_grad():
+                state = torch.FloatTensor(state).to(device)
+                action, action_logprob = self.policy_old.act(state)
+            
+            self.buffer.states.append(state)
+            self.buffer.actions.append(action)
+            self.buffer.logprobs.append(action_logprob)
+
+            return action.item()
+
+    def select_best_action(self, state):
+
+        if self.has_continuous_action_space:
+            with torch.no_grad():
+                state = torch.FloatTensor(state).to(device)
+                action, action_logprob = self.policy_old.act_best(state)
 
             self.buffer.states.append(state)
             self.buffer.actions.append(action)

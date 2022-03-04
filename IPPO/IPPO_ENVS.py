@@ -153,8 +153,11 @@ class Create_Envs(object):
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
 
-        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
-        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
+        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25, 
+            (npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
+            
+        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25, 
+            (ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
         
         ego_acceleration = abs(ego.get_acceleration().y)
         npc_acceleration = abs(npc.get_acceleration().y)
@@ -192,5 +195,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0] # ego_x,y,yaw;npc_x,y,yaw,velocity
+        state_space = [0,0,0,0,0,0,0,0] # ego_x,y,yaw;npc_x,y,yaw,velocity,npc_x,y,yaw;npc_x,y,yaw,velocity
         return state_space
