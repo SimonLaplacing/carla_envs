@@ -105,8 +105,12 @@ def main():
 
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
-                ego_action = ego_PPO.select_action(ego_state)
-                npc_action = npc_PPO.select_action(npc_state)
+                if args.mode == 'test':
+                    ego_action = ego_PPO.select_best_action(ego_state)
+                    npc_action = npc_PPO.select_best_action(npc_state)
+                else:
+                    ego_action = ego_PPO.select_action(ego_state)
+                    npc_action = npc_PPO.select_action(npc_state)
                 
                 create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                 #---------和环境交互动作反馈---------
