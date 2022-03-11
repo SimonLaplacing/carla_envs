@@ -26,7 +26,7 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
@@ -36,7 +36,7 @@ parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
-parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+parser.add_argument('--fixed_delta_seconds', default=0.1, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
@@ -61,14 +61,14 @@ else:
 
 # 状态、动作空间定义
 action_space = create_envs.get_action_space()
-state_space = create_envs.get_state_space()
-state_dim = len(state_space)
+state_dim = create_envs.get_state_space()
+
 action_dim = len(action_space)
 actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float()
 min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-IPPO./'
+directory = './carla-IPPO3/'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
@@ -86,18 +86,25 @@ def main():
             print('------------%dth time learning begins-----------'%i)
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
 
-            ego_transform = ego_list[0].get_transform()
-            npc_transform = npc_list[0].get_transform()
-            ego_velocity = ego_list[0].get_velocity().x
-            npc_velocity = npc_list[0].get_velocity().x
-            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25, 
-                (npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
-
-            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25, 
-                (ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
-
             egosen_list = sensor_list[0]
             npcsen_list = sensor_list[1]
+
+            # ego_transform = ego_list[0].get_transform()
+            # npc_transform = npc_list[0].get_transform()
+            ego_velocity = ego_list[0].get_velocity().x
+            npc_velocity = npc_list[0].get_velocity().x
+
+            ego_angular = ego_list[0].get_angular_velocity().z
+            npc_angular = npc_list[0].get_angular_velocity().z
+            ego_camera = egosen_list[2].get_BEV()
+            npc_camera = npcsen_list[2].get_BEV()
+            # print('1111111111:  ',ego_camera.shape)
+            ego_state1 = np.array([ego_velocity/25,ego_angular/2])
+            npc_state1 = np.array([npc_velocity/25,npc_angular/2])
+            ego_state2 = ego_camera
+            npc_state2 = npc_camera
+
+            
 
             # if (i+1) % int(200) == 0:
             #         ego_PPO.decay_action_std(0.05, 0.1)
@@ -106,11 +113,11 @@ def main():
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
                 if args.mode == 'test':
-                    ego_action = ego_PPO.select_best_action(ego_state)
-                    npc_action = npc_PPO.select_best_action(npc_state)
+                    ego_action = ego_PPO.select_best_action(ego_state1,ego_state2)
+                    npc_action = npc_PPO.select_best_action(npc_state1,npc_state2)
                 else:
-                    ego_action = ego_PPO.select_action(ego_state)
-                    npc_action = npc_PPO.select_action(npc_state)
+                    ego_action = ego_PPO.select_action(ego_state1,ego_state2)
+                    npc_action = npc_PPO.select_action(npc_state1,npc_state2)
                 
                 create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
                 #---------和环境交互动作反馈---------
@@ -121,7 +128,7 @@ def main():
                 else:
                     world.wait_for_tick() # 服务器主导，tick
 
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
+                ego_next_state1,ego_next_state2,ego_reward,ego_done,npc_next_state1,npc_next_state2,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
 
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
@@ -129,8 +136,10 @@ def main():
                 npc_PPO.buffer.rewards.append(npc_reward)
                 npc_PPO.buffer.is_terminals.append(npc_done)
 
-                ego_state = ego_next_state
-                npc_state = npc_next_state
+                ego_state1 = ego_next_state1
+                ego_state2 = ego_next_state2
+                npc_state1 = npc_next_state1
+                ego_state2 = npc_next_state2
                 
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward
