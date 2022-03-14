@@ -48,7 +48,7 @@ class Actor(nn.Module):
         x = F.leaky_relu(self.fc2(x))
 
         mu = F.softsign(self.mu_head(x))
-        sigma = self.action_std_init*F.sigmoid(self.sigma_head(x))
+        sigma = self.action_std_init*torch.sigmoid(self.sigma_head(x))
 
         return mu, sigma
 

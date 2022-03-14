@@ -165,8 +165,8 @@ class Create_Envs(object):
         npc_velocity = npc.get_velocity().x
         ego_angular = ego.get_angular_velocity().z
         npc_angular = npc.get_angular_velocity().z
-        ego_next_state = np.array([ego_velocity/25,ego_angular/2], [ego_camera])
-        npc_next_state = np.array([npc_velocity/25,npc_angular/2], [npc_camera])
+        ego_next_state = [[ego_velocity/25,ego_angular/2], [ego_camera]]
+        npc_next_state = [[npc_velocity/25,npc_angular/2], [npc_camera]]
         # ego_next_state2 = np.array([ego_camera])
         # npc_next_state2 = np.array([npc_camera])
         

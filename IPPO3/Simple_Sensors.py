@@ -11,7 +11,6 @@ import os
 import sys
 import weakref
 import numpy as np
-# import pygame
 
 try:
     sys.path.append(glob.glob('D:/CARLA_0.9.11/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
@@ -134,15 +133,16 @@ class Camera(object):
         self = weak_self()
         if not self:
             return
-        # array = np.frombuffer(raw_data, dtype=np.dtype("uint8"))
-        # array = np.reshape(array, (image.height, image.width, 4))
-        # array = array[:, :, :3]
-        # array = array[:, :, ::-1]
-        # self.BEV = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        array = image.convert(cc.CityScapesPalette)
-        array = array.swapaxes(0, 2)
-        array = array.swapaxes(1, 2)
+        
+        image.convert(cc.CityScapesPalette)
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8")) # BGRA_Binary TO BGRA_Seq
+        array = np.reshape(array, (image.height, image.width, 4)) # BGRA_Seq TO BGRA_Array
+        array = array[:, :, :3] # BGRA_Array TO BGR_Array
+        array = array[:, :, ::-1] # BGR_Array TO RGB_Array
+        array = array.swapaxes(0, 2) # [H, W, 3] TO [3, W, H]
+        array = array.swapaxes(1, 2) # [3, W, H] TO [3, H, W]
         self.BEV = array
+        # print('aaa: ',array.shape)
         if self.recording:
             image.save_to_disk(self.directory + self.name + '_image_%06d' % image.frame, cc.CityScapesPalette)
            

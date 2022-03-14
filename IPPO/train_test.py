@@ -26,7 +26,7 @@ import carla
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
@@ -46,7 +46,6 @@ parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 script_name = os.path.basename(__file__)
 
 # 环境建立

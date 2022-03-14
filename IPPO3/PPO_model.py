@@ -50,7 +50,7 @@ class Actor(nn.Module):
         self.fc4 = nn.Linear(1024,48)
 
         self.mu_head = nn.Linear(64, action_dim)
-        self.sigma_head = nn.Linear(64, 1)
+        self.sigma_head = nn.Linear(64, action_dim)
 
     def forward(self, x1, x2):
         # x1, x2 = x
@@ -125,10 +125,7 @@ class ActorCritic(nn.Module):
         if self.has_continuous_action_space:
             action_mean, action_sigma = self.actor(state1,state2)
             action_var = action_sigma ** 2
-            # action_var = torch.full((self.action_dim,), 0.6).to(device)
-            action_var = action_var.repeat(1,2).to(device)
-            cov_mat = torch.diag_embed(action_var).to(device)
-            # cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
         else:
             action_probs = self.actor(state1,state2)
@@ -148,10 +145,7 @@ class ActorCritic(nn.Module):
             action_mean, action_sigma = self.actor(state1, state2)
             action = action_mean
             action_var = action_sigma ** 2
-            # action_var = torch.full((self.action_dim,), 0.6).to(device)
-            action_var = action_var.repeat(1,2).to(device)
-            cov_mat = torch.diag_embed(action_var).to(device)
-            # cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
         else:
             action_probs = self.actor(state1, state2)
@@ -171,9 +165,7 @@ class ActorCritic(nn.Module):
         if self.has_continuous_action_space:
             action_mean, action_sigma = self.actor(state1, state2)
             action_var = action_sigma ** 2
-            # action_sigma = torch.full((self.action_dim,), 0.6).to(device)
-            action_var = action_var.repeat(1,2).to(device)
-            cov_mat = torch.diag_embed(action_var).to(device)
+            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
             
             # For Single Action Environments.
