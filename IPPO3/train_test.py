@@ -51,10 +51,10 @@ script_name = os.path.basename(__file__)
 
 # 环境建立
 if args.mode == 'train':
-    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
+    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds,size=[300,200]) # 设置仿真模式以及步长
     print('==========training mode is activated==========')
 elif args.mode == 'test':
-    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,False,args.fixed_delta_seconds)
+    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,False,args.fixed_delta_seconds,size=[300,200])
     print('===========testing mode is activated===========')
 else:
     raise NameError("wrong mode!!!")
@@ -68,7 +68,7 @@ actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float()
 min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-IPPO3/'
+directory = './carla-IPPO3./'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
@@ -99,10 +99,10 @@ def main():
             ego_camera = egosen_list[2].get_BEV()
             npc_camera = npcsen_list[2].get_BEV()
             # print('1111111111:  ',ego_camera.shape)
-            ego_state1 = np.array([ego_velocity/25,ego_angular/2])
-            npc_state1 = np.array([npc_velocity/25,npc_angular/2])
-            ego_state2 = np.array([ego_camera])
-            npc_state2 = np.array([npc_camera])
+            ego_state = np.array([ego_velocity/25,ego_angular/2],[ego_camera])
+            npc_state = np.array([npc_velocity/25,npc_angular/2],[npc_camera])
+            # ego_state2 = np.array([ego_camera])
+            # npc_state2 = np.array([npc_camera])
 
             
 
@@ -113,13 +113,13 @@ def main():
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
                 if args.mode == 'test':
-                    ego_action = ego_PPO.select_best_action(ego_state1,ego_state2)
-                    npc_action = npc_PPO.select_best_action(npc_state1,npc_state2)
+                    ego_action = ego_PPO.select_best_action(ego_state)
+                    npc_action = npc_PPO.select_best_action(npc_state)
                 else:
-                    ego_action = ego_PPO.select_action(ego_state1,ego_state2)
-                    npc_action = npc_PPO.select_action(npc_state1,npc_state2)
+                    ego_action = ego_PPO.select_action(ego_state)
+                    npc_action = npc_PPO.select_action(npc_state)
                 
-                create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
+                create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, t)
                 #---------和环境交互动作反馈---------
                 frames = 1 # 步长 
                 if args.synchronous_mode:
@@ -128,7 +128,7 @@ def main():
                 else:
                     world.wait_for_tick() # 服务器主导，tick
 
-                ego_next_state1,ego_next_state2,ego_reward,ego_done,npc_next_state1,npc_next_state2,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
+                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
 
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
@@ -136,10 +136,10 @@ def main():
                 npc_PPO.buffer.rewards.append(npc_reward)
                 npc_PPO.buffer.is_terminals.append(npc_done)
 
-                ego_state1 = ego_next_state1
-                ego_state2 = ego_next_state2
-                npc_state1 = npc_next_state1
-                ego_state2 = npc_next_state2
+                ego_state = ego_next_state
+                # ego_state2 = ego_next_state2
+                npc_state = npc_next_state
+                # ego_state2 = npc_next_state2
                 
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward

@@ -20,10 +20,12 @@ import Simple_Sensors as SS
 directory = './carla-IPPO3/'
 
 class Create_Envs(object):
-    def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
+    def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05,size=[300,200]):
         self.synchronous_mode = synchronous_mode
         self.no_rendering_mode = no_rendering_mode
         self.fixed_delta_seconds = fixed_delta_seconds
+        self.H = size[0]
+        self.W = size[1]
 
     def connection(self):
         # 连接客户端:localhost:2000\192.168.199.238:2000
@@ -107,13 +109,13 @@ class Create_Envs(object):
         npc_collision = SS.CollisionSensor(npc)
         ego_invasion = SS.LaneInvasionSensor(ego)
         npc_invasion = SS.LaneInvasionSensor(npc)
-        ego_camera = SS.Camera(ego, 'ego', directory, 500, 300)
-        npc_camera = SS.Camera(npc, 'npc', directory, 500, 300)
+        ego_camera = SS.Camera(ego, 'ego', directory, self.H, self.W)
+        npc_camera = SS.Camera(npc, 'npc', directory, self.H, self.W)
         sensor_list.extend([[ego_collision,ego_invasion,ego_camera],[npc_collision,npc_invasion,npc_camera]])
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
-    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time,step):
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,step):
         if step == 0:
             # 初始速度设定
             ego_target_speed = carla.Vector3D(16.5,0,0)
@@ -163,10 +165,10 @@ class Create_Envs(object):
         npc_velocity = npc.get_velocity().x
         ego_angular = ego.get_angular_velocity().z
         npc_angular = npc.get_angular_velocity().z
-        ego_next_state1 = np.array([ego_velocity/25,ego_angular/2])
-        npc_next_state1 = np.array([npc_velocity/25,npc_angular/2])
-        ego_next_state2 = np.array([ego_camera])
-        npc_next_state2 = np.array([npc_camera])
+        ego_next_state = np.array([ego_velocity/25,ego_angular/2], [ego_camera])
+        npc_next_state = np.array([npc_velocity/25,npc_angular/2], [npc_camera])
+        # ego_next_state2 = np.array([ego_camera])
+        # npc_next_state2 = np.array([npc_camera])
         
         ego_acceleration = abs(ego.get_acceleration().y)
         npc_acceleration = abs(npc.get_acceleration().y)
@@ -189,7 +191,7 @@ class Create_Envs(object):
             npc_done = True
         else:
             npc_done = False  
-        return [ego_next_state1,ego_next_state2,ego_reward,ego_done,npc_next_state1,npc_next_state2,npc_reward,npc_done]
+        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done]
 
     # 车辆动作空间
     def get_action_space(self):
@@ -198,5 +200,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_dim = [2,[300,500]] # ego_velocity,angular_velocity;
+        state_dim = [2,[self.H,self.W]] # ego_velocity,angular_velocity;
         return state_dim
