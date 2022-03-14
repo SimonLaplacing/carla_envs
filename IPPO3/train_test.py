@@ -34,10 +34,10 @@ parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习�
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
 
-parser.add_argument('--fig_size', default=[20,20], type=list) # BEV尺寸
+parser.add_argument('--fig_size', default=[200,100], type=list) # BEV尺寸
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.1, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
@@ -100,8 +100,8 @@ def main():
             ego_camera = egosen_list[2].get_BEV()
             npc_camera = npcsen_list[2].get_BEV()
             # print('1111111111:  ',ego_camera.shape)
-            ego_state = [[ego_velocity/25,ego_angular/2],[ego_camera]]
-            npc_state = [[npc_velocity/25,npc_angular/2],[npc_camera]]
+            ego_state = [ego_camera]
+            npc_state = [npc_camera]
             # ego_state2 = np.array([ego_camera])
             # npc_state2 = np.array([npc_camera])
 

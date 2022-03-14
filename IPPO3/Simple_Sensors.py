@@ -105,10 +105,10 @@ class Camera(object):
         """Constructor method"""
         # self.sensor = None
         self._parent = parent_actor
-        self.recording = True
+        self.recording = False
         self.directory = directory
         self.name = name
-        self.BEV = np.zeros((3, W, H), dtype=np.uint8)
+        self.BEV = np.zeros((3, H, W), dtype=np.uint8)
         world = self._parent.get_world()
         blueprint = world.get_blueprint_library().find('sensor.camera.semantic_segmentation') #semantic_segmentation
         blueprint.set_attribute('image_size_x', str(W))
@@ -116,7 +116,7 @@ class Camera(object):
         blueprint.set_attribute('fov', '90')
         # Set the time in seconds between sensor captures
         blueprint.set_attribute('sensor_tick', '0')
-        transform = Transform(Location(z=30), Rotation(pitch=-90))
+        transform = Transform(Location(z=15), Rotation(pitch=-90))
         self.sensor = world.spawn_actor(blueprint, transform, attach_to=self._parent)
         # We need to pass the lambda a weak reference to
         # self to avoid circular reference.

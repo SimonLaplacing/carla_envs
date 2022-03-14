@@ -1,3 +1,4 @@
+import numpy as np
 from numpy import cov
 import torch
 import torch.nn as nn
@@ -39,56 +40,56 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.action_std_init = action_std_init
 
-        self.fc1 = nn.Linear(state_dim[0], 64)
-        self.fc2 = nn.Linear(64,16)
+        # self.fc1 = nn.Linear(state_dim[0], 64)
+        # self.fc2 = nn.Linear(64,16)
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=3,out_channels=8,kernel_size=3,stride=1,padding=1),                              
             nn.ReLU(),
             nn.AvgPool2d(kernel_size=2))
         self.fc3 = nn.Linear(state_dim[1][0]*state_dim[1][1]*2,1024)
-        self.fc4 = nn.Linear(1024,48)
+        self.fc4 = nn.Linear(1024,64)
 
         self.mu_head = nn.Linear(64, action_dim)
         self.sigma_head = nn.Linear(64, action_dim)
 
-    def forward(self, x1, x2):
+    def forward(self, x2):
         # x1, x2 = x
-        x1 = F.leaky_relu(self.fc1(x1))
-        x1 = F.leaky_relu(self.fc2(x1))
+        # x1 = F.leaky_relu(self.fc1(x1))
+        # x1 = F.leaky_relu(self.fc2(x1))
         x2 = self.conv1(x2)
         x2 = F.relu(self.fc3(x2.view(x2.size(0),-1)))
         x2 = F.relu(self.fc4(x2))
-        x3 = torch.cat((x1,x2[0]),-1)
-        mu = F.softsign(self.mu_head(x3))
-        sigma = self.action_std_init*torch.sigmoid(self.sigma_head(x3))
+        # x3 = torch.cat((x1,x2[0]),-1)
+        mu = F.softsign(self.mu_head(x2))
+        sigma = self.action_std_init*torch.sigmoid(self.sigma_head(x2))
 
         return mu, sigma
 
 class Critic(nn.Module):
     def __init__(self, state_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim[0], 64)
-        self.fc2 = nn.Linear(64,16)
+        # self.fc1 = nn.Linear(state_dim[0], 64)
+        # self.fc2 = nn.Linear(64,16)
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=3,out_channels=8,kernel_size=3,stride=1,padding=1),                              
             nn.ReLU(),
             nn.AvgPool2d(kernel_size=2))
         self.fc3 = nn.Linear(state_dim[1][0]*state_dim[1][1]*2,1024)
-        self.fc4 = nn.Linear(1024,48)
+        self.fc4 = nn.Linear(1024,64)
 
         self.state_value= nn.Linear(64, 1)
 
-    def forward(self, x1, x2):
+    def forward(self, x2):
         # x1, x2 = x
-        x1 = F.leaky_relu(self.fc1(x1))
-        x1 = F.leaky_relu(self.fc2(x1))
+        # x1 = F.leaky_relu(self.fc1(x1))
+        # x1 = F.leaky_relu(self.fc2(x1))
         x2 = self.conv1(x2)
         x2 = F.relu(self.fc3(x2.view(x2.size(0),-1)))
         x2 = F.relu(self.fc4(x2))
-        x3 = torch.cat((x1,x2[0]),-1)
-        value = self.state_value(x3)
+        # x3 = torch.cat((x1,x2[0]),-1)
+        value = self.state_value(x2)
         return value
 
 class ActorCritic(nn.Module):
@@ -119,16 +120,17 @@ class ActorCritic(nn.Module):
         raise NotImplementedError
     
     def act(self, state):
-        state1, state2 = state
-        state1 = torch.FloatTensor(state1).to(device)
-        state2 = torch.FloatTensor(state2).to(device)
+        # state1, state2 = state
+        # state1 = torch.FloatTensor(state1).to(device)
+        # state2 = torch.FloatTensor(state2).to(device)
         if self.has_continuous_action_space:
-            action_mean, action_sigma = self.actor(state1,state2)
+            action_mean, action_sigma = self.actor(state)
             action_var = action_sigma ** 2
-            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            cov_mat = torch.diag_embed(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
+            # print(dist)
         else:
-            action_probs = self.actor(state1,state2)
+            action_probs = self.actor(state)
             dist = Categorical(action_probs)
 
         action = dist.sample()
@@ -138,17 +140,17 @@ class ActorCritic(nn.Module):
         return action.detach(), action_logprob.detach()
 
     def act_best(self, state):
-        state1, state2 = state
-        state1 = torch.FloatTensor(state1).to(device)
-        state2 = torch.FloatTensor(state2).to(device)
+        # state1, state2 = state
+        # state1 = torch.FloatTensor(state1).to(device)
+        # state2 = torch.FloatTensor(state2).to(device)
         if self.has_continuous_action_space:
-            action_mean, action_sigma = self.actor(state1, state2)
+            action_mean, action_sigma = self.actor(state)
             action = action_mean
             action_var = action_sigma ** 2
-            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            cov_mat = torch.diag_embed(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
         else:
-            action_probs = self.actor(state1, state2)
+            action_probs = self.actor(state)
             action = torch.argmax(action_probs)
             dist = Categorical(action_probs)
 
@@ -159,24 +161,24 @@ class ActorCritic(nn.Module):
         return action.detach(), action_logprob.detach()
     
     def evaluate(self, state, action):
-        state1, state2 = state
-        state1 = torch.FloatTensor(state1).to(device)
-        state2 = torch.FloatTensor(state2).to(device)
+        # state1, state2 = state
+        # state1 = torch.FloatTensor(state1).to(device)
+        # state2 = torch.FloatTensor(state2).to(device)
         if self.has_continuous_action_space:
-            action_mean, action_sigma = self.actor(state1, state2)
+            action_mean, action_sigma = self.actor(state)
             action_var = action_sigma ** 2
-            cov_mat = torch.diag(action_var).unsqueeze(dim=0)
+            cov_mat = torch.diag_embed(action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
             
             # For Single Action Environments.
             if self.action_dim == 1:
                 action = action.reshape(-1, self.action_dim)
         else:
-            action_probs = self.actor(state1, state2)
+            action_probs = self.actor(state)
             dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
-        state_values = self.critic(state1, state2)
+        state_values = self.critic(state)
         
         return action_logprobs, state_values, dist_entropy
 
@@ -207,6 +209,7 @@ class PPO:
         self.MseLoss = nn.MSELoss()
 
     def select_action(self, state):
+        state = torch.FloatTensor(np.array(state)/255).to(device)
         if self.has_continuous_action_space:
             with torch.no_grad():
                 
@@ -229,6 +232,7 @@ class PPO:
             return action.item()
 
     def select_best_action(self, state):
+        state = torch.FloatTensor(np.array(state)/255).to(device)
         if self.has_continuous_action_space:
             with torch.no_grad():
                 # state = torch.FloatTensor(state).to(device)
