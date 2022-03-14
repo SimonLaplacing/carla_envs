@@ -43,10 +43,10 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(64,16)
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=3,out_channels=8,kernel_size=3,stride=1,padding=2),                              
+            nn.Conv2d(in_channels=3,out_channels=8,kernel_size=3,stride=1,padding=1),                              
             nn.ReLU(),
             nn.AvgPool2d(kernel_size=2))
-        self.fc3 = nn.Linear(state_dim[1][0]*state_dim[1][1]//4,1024)
+        self.fc3 = nn.Linear(state_dim[1][0]*state_dim[1][1]*2,1024)
         self.fc4 = nn.Linear(1024,48)
 
         self.mu_head = nn.Linear(64, action_dim)
@@ -58,7 +58,7 @@ class Actor(nn.Module):
         x2 = self.conv1(x2)
         x2 = F.relu(self.fc3(x2.view(x2.size(0),-1)))
         x2 = F.relu(self.fc4(x2))
-        x3 = torch.cat((x1,x2),-1)
+        x3 = torch.cat((x1,x2[0]),-1)
         mu = F.softsign(self.mu_head(x3))
         sigma = self.action_std_init*torch.sigmoid(self.sigma_head(x3))
 
@@ -85,7 +85,7 @@ class Critic(nn.Module):
         x2 = self.conv1(x2)
         x2 = F.relu(self.fc3(x2.view(x2.size(0),-1)))
         x2 = F.relu(self.fc4(x2))
-        x3 = torch.cat((x1,x2),-1)
+        x3 = torch.cat((x1,x2[0]),-1)
         value = self.state_value(x3)
         return value
 
@@ -262,7 +262,7 @@ class PPO:
                 
                 action, action_logprob = self.policy_old.act(state1,state2)
 
-            self.buffer.states.append(state1,state2)
+            self.buffer.states.append([state1,state2])
             self.buffer.actions.append(action)
             self.buffer.logprobs.append(action_logprob)
 
@@ -272,24 +272,23 @@ class PPO:
                 # state = torch.FloatTensor(state).to(device)
                 action, action_logprob = self.policy_old.act(state1,state2)
             
-            self.buffer.states.append(state1,state2)
+            self.buffer.states.append([state1,state2])
             self.buffer.actions.append(action)
             self.buffer.logprobs.append(action_logprob)
 
             return action.item()
 
-    def select_best_action(self, state):
-        state1,state2 = state
+    def select_best_action(self, state1, state2):
+
         state1 = torch.FloatTensor(state1).to(device)
         state2 = torch.FloatTensor(state2).to(device)
-        state = [state1,state2]
 
         if self.has_continuous_action_space:
             with torch.no_grad():
                 # state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act_best(state)
+                action, action_logprob = self.policy_old.act_best(state1, state2)
 
-            self.buffer.states.append(state)
+            self.buffer.states.append([state1, state2])
             self.buffer.actions.append(action)
             self.buffer.logprobs.append(action_logprob)
 
@@ -297,9 +296,9 @@ class PPO:
         else:
             with torch.no_grad():
                 # state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act(state)
+                action, action_logprob = self.policy_old.act(state1, state2)
             
-            self.buffer.states.append(state)
+            self.buffer.states.append([state1, state2])
             self.buffer.actions.append(action)
             self.buffer.logprobs.append(action_logprob)
 

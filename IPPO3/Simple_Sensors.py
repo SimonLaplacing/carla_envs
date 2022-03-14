@@ -109,7 +109,7 @@ class Camera(object):
         self.recording = True
         self.directory = directory
         self.name = name
-        self.BEV = np.zeros((W, H, 3), dtype=np.uint8)
+        self.BEV = np.zeros((3, W, H), dtype=np.uint8)
         world = self._parent.get_world()
         blueprint = world.get_blueprint_library().find('sensor.camera.semantic_segmentation') #semantic_segmentation
         blueprint.set_attribute('image_size_x', str(W))
@@ -139,7 +139,10 @@ class Camera(object):
         # array = array[:, :, :3]
         # array = array[:, :, ::-1]
         # self.BEV = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        self.BEV =image.convert(cc.CityScapesPalette)
+        array = image.convert(cc.CityScapesPalette)
+        array = array.swapaxes(0, 2)
+        array = array.swapaxes(1, 2)
+        self.BEV = array
         if self.recording:
             image.save_to_disk(self.directory + self.name + '_image_%06d' % image.frame, cc.CityScapesPalette)
            

@@ -101,8 +101,8 @@ def main():
             # print('1111111111:  ',ego_camera.shape)
             ego_state1 = np.array([ego_velocity/25,ego_angular/2])
             npc_state1 = np.array([npc_velocity/25,npc_angular/2])
-            ego_state2 = ego_camera
-            npc_state2 = npc_camera
+            ego_state2 = np.array([ego_camera])
+            npc_state2 = np.array([npc_camera])
 
             
 
