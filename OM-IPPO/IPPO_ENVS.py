@@ -195,5 +195,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0,0,0,0,0] # ego_x,y,yaw,velocity;npc_x,y,yaw,velocity;predicted action;
+        state_space = [0,0,0,0,0,0,0,0] # ego_x,y,yaw,velocity;npc_x,y,yaw,velocity;
         return state_space

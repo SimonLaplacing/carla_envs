@@ -142,10 +142,13 @@ def main():
             
             if args.mode == 'train':    
                 if i > 0 and (i+1) % args.update_interval == 0:
-                    ego_PPO.update()
+                    ego_PPO.update(npc_PPO)
                     print('ego_updated')
-                    npc_PPO.update()
+                    npc_PPO.update(ego_PPO)
                     print('npc_updated')
+                    ego_PPO.clear()
+                    npc_PPO.clear()
+                    
                 if i > 0 and (i+1) % args.log_interval == 0:
                     ego_PPO.save(directory + 'ego.pkl')
                     npc_PPO.save(directory + 'npc.pkl')
