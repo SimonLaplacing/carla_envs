@@ -118,9 +118,9 @@ class ActorCritic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def act(self, state):
+    def act(self, state, opponent_state):
         if self.has_continuous_action_space:
-            pre_mean, pre_sigma = self.om(state)
+            pre_mean, pre_sigma = self.om(opponent_state)
             pre_var = pre_sigma ** 2
             pre_var = pre_var.repeat(1,2).to(device)
             pre_mat = torch.diag_embed(pre_var).to(device)
@@ -142,9 +142,9 @@ class ActorCritic(nn.Module):
         
         return action.detach(), action_logprob.detach(), pre_action.detach()
 
-    def act_best(self, state):
+    def act_best(self, state, opponent_state):
         if self.has_continuous_action_space:
-            pre_mean, _ = self.om(state)
+            pre_mean, _ = self.om(opponent_state)
             pre_action = pre_mean
             pre_action = pre_action.clamp(-1, 1)
 
@@ -165,10 +165,10 @@ class ActorCritic(nn.Module):
         
         return action.detach(), action_logprob.detach(), pre_action.detach()
     
-    def evaluate(self, state, action):
+    def evaluate(self, state, opponent_state, action):
 
         if self.has_continuous_action_space:
-            pre_mean, pre_sigma = self.om(state)
+            pre_mean, pre_sigma = self.om(state, opponent_state)
             pre_var = pre_sigma ** 2
             pre_var = pre_var.repeat(1,2).to(device)
             pre_mat = torch.diag_embed(pre_var).to(device)
@@ -222,12 +222,13 @@ class PPO:
         
         self.MseLoss = nn.MSELoss()
 
-    def select_action(self, state):
+    def select_action(self, state, opponent_state):
 
         if self.has_continuous_action_space:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob, pre_action = self.policy_old.act(state)
+                opponent_state = torch.FloatTensor(opponent_state).to(device)
+                action, action_logprob, pre_action = self.policy_old.act(state, opponent_state)
 
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -238,7 +239,7 @@ class PPO:
         else:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act(state)
+                action, action_logprob = self.policy_old.act(state, opponent_state)
             
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -246,12 +247,13 @@ class PPO:
 
             return action.item()
 
-    def select_best_action(self, state):
+    def select_best_action(self, state, opponent_state):
 
         if self.has_continuous_action_space:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob, pre_action = self.policy_old.act_best(state)
+                opponent_state = torch.FloatTensor(opponent_state).to(device)
+                action, action_logprob, pre_action = self.policy_old.act_best(state,opponent_state)
 
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -262,7 +264,8 @@ class PPO:
         else:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act(state)
+                opponent_state = torch.FloatTensor(opponent_state).to(device)
+                action, action_logprob = self.policy_old.act(state,opponent_state)
             
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -286,6 +289,7 @@ class PPO:
 
         # convert list to tensor
         old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach().to(device)
+        old_opponent_states = torch.squeeze(torch.stack(opponent.buffer.states, dim=0)).detach().to(device)
         old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach().to(device)
         old_pre_actions = torch.squeeze(torch.stack(opponent.buffer.pre_actions, dim=0)).detach().to(device)
         old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach().to(device)
@@ -294,7 +298,7 @@ class PPO:
         for _ in range(self.K_epochs):
 
             # Evaluating old actions and values
-            logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_opponent_states, old_actions)
 
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)
