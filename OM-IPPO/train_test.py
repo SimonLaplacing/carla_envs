@@ -40,9 +40,9 @@ parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
-parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
+parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=1800, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
 args = parser.parse_args()
 

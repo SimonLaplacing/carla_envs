@@ -148,7 +148,7 @@ class ActorCritic(nn.Module):
             pre_action = pre_mean
             pre_action = pre_action.clamp(-1, 1)
 
-            action_mean, action_sigma = self.actor(state,pre_action[0])
+            action_mean, action_sigma = self.actor(state,pre_action)
             action = action_mean
             action_var = action_sigma ** 2
             action_var = action_var.repeat(1,2).to(device)

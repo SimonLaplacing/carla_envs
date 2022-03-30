@@ -168,10 +168,11 @@ class Create_Envs(object):
         # npc_inv = npc_sensor[1].get_invasion_history()
 
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
-        eb=-0.5 if ego_velocity <= 2 else 0
+        ev=-1 if ego_velocity <= 2 else 0
+        nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + eb + step/100
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + eb + step/100
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + ev + step/100
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + nv + step/100
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
