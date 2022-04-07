@@ -15,7 +15,7 @@ from carla import Transform, Location, Rotation
 
 import time
 
-# import Simple_Sensors as SS
+import Simple_Sensors as SS
 
 class Create_Envs(object):
     def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
@@ -48,7 +48,7 @@ class Create_Envs(object):
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        ego_transform = Transform(Location(x=40, y=-4.350967, z=1.452074), 
+        ego_transform = Transform(Location(x=30, y=-4.350967, z=0.1), 
                     Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
@@ -57,18 +57,18 @@ class Create_Envs(object):
 
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
-        # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=40, y=-4.350967, z=1.452074), 
+        spec_transform = Transform(Location(x=30, y=-4.350967, z=0), 
                     Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
-        spec_transform.location += carla.Location(x=-20,z=45)
-        spec_transform.rotation = carla.Rotation(pitch=0,yaw=0,roll=-0.000000)
+        spec_transform.location += carla.Location(x=-15,z=50)
+        spec_transform.rotation = carla.Rotation(pitch=-90,yaw=0,roll=-0.000000)
         spectator.set_transform(spec_transform)
 
         # npc设置--------------------------------------------------------------------
-        npc_transform = ego_transform
+        npc_transform = Transform(Location(x=30, y=-4.350967, z=0.1), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
         for i in range(1):
-            npc_transform.location += carla.Location(x=-10,y=0, z=0)
-            npc_transform.rotation = carla.Rotation(pitch=0.348271,yaw=270, roll=-0.000000)
+            npc_transform.location += carla.Location(x=-11,y=6)
+            npc_transform.rotation = carla.Rotation(pitch=0.348271,yaw=275, roll=-0.000000)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             # print(npc_bp.get_attribute('color').recommended_values)
             npc_bp.set_attribute('color', '229,28,0')
@@ -80,33 +80,67 @@ class Create_Envs(object):
                 print('created %s' % npc.type_id)
 
         # 障碍物设置------------------------------------------------------------------
-        # obstacle_transform = ego_transform
-        # for i in range(28):
-        #     if i == 0:
-        #         obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
-        #         obstacle_transform.location += carla.Location(x=95,y=3.8)
-        #         obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
-        #         obstacle_transform.location += carla.Location(x=0,y=-5.3)
-        #         if obstacle is None:
-        #             print('%s obstacle created failed' % i)
-        #         else:
-        #             obstacle_list.append(obstacle)
-        #             print('created %s' % obstacle.type_id)
-        #     else:
-        #         obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
-        #         obstacle_transform.location += carla.Location(x=-3.5,y=7.4)
-        #         obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
-        #         obstacle_list.append(obstacle1)
-        #         obstacle_transform.location += carla.Location(y=-7.4)
-        #         obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
-        #         obstacle_list.append(obstacle2)
-
+        obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
+        #障碍物1
+        obstacle_transform1 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform1.location += carla.Location(x=14,y=1.8)
+        obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
+        for i in range(10):
+            obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
+            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.04)
+            obstacle_list.append(obstacle1)
+        #障碍物2
+        obstacle_transform2 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform2.location += carla.Location(x=-8.5,y=1.82)
+        obstacle_transform2.rotation = carla.Rotation(pitch=0, yaw=275, roll=0.000000)
+        for i in range(4):
+            obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=-0.1,y=2.5)
+            obstacle_list.append(obstacle2)
+        #障碍物3
+        obstacle_transform3 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform3.location += carla.Location(x=13,y=-1.8)
+        obstacle_transform3.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
+        for i in range(9):
+            obstacle3 = world.try_spawn_actor(obsta_bp, obstacle_transform3)
+            obstacle_transform3.location += carla.Location(x=-2.5,y=-0.1)
+            obstacle_list.append(obstacle3)
+        #障碍物4
+        obstacle_transform4 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform4.location += carla.Location(x=-24,y=-52)
+        obstacle_transform4.rotation = carla.Rotation(pitch=0, yaw=270, roll=0.000000)
+        for i in range(15):
+            obstacle4 = world.try_spawn_actor(obsta_bp, obstacle_transform4)
+            obstacle_transform4.location += carla.Location(x=-0.05,y=2.5)
+            obstacle_list.append(obstacle4)
+        #障碍物5
+        obstacle_transform5 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform5.location += carla.Location(x=-20.5,y=-52)
+        obstacle_transform5.rotation = carla.Rotation(pitch=0, yaw=270, roll=0.000000)
+        for i in range(13):
+            obstacle5 = world.try_spawn_actor(obsta_bp, obstacle_transform5)
+            obstacle_transform5.location += carla.Location(x=-0.05,y=2.5)
+            obstacle_list.append(obstacle5)
+        #障碍物6
+        obstacle_transform6 =Transform(Location(x=30, y=-4.350967, z=0), 
+                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
+        obstacle_transform6.location += carla.Location(x=-20,y=-21)
+        obstacle_transform6.rotation = carla.Rotation(pitch=0, yaw=45, roll=0.000000)
+        for i in range(8):
+            obstacle6 = world.try_spawn_actor(obsta_bp, obstacle_transform6)
+            obstacle_transform6.location += carla.Location(x=1.7,y=2.4)
+            obstacle_list.append(obstacle6)
         # 传感器设置-------------------------------------------------------------------
-        # ego_collision = SS.CollisionSensor(ego)
-        # npc_collision = SS.CollisionSensor(npc)
-        # ego_invasion = SS.LaneInvasionSensor(ego)
-        # npc_invasion = SS.LaneInvasionSensor(npc)
-        # sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
+        ego_collision = SS.CollisionSensor(ego)
+        npc_collision = SS.CollisionSensor(npc)
+        ego_invasion = SS.LaneInvasionSensor(ego)
+        npc_invasion = SS.LaneInvasionSensor(npc)
+        sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
 
         return ego_list,npc_list,obstacle_list,sensor_list
 
