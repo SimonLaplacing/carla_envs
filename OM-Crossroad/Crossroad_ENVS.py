@@ -47,7 +47,7 @@ class Create_Envs(object):
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        ego_transform = Transform(Location(x=9, y=-110.350967, z=0.1), 
+        ego_transform = Transform(Location(x=9, y=-110.350967, z=0.2), 
                     Rotation(pitch=0, yaw=-90, roll=-0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
@@ -88,7 +88,7 @@ class Create_Envs(object):
         obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
         for i in range(30):
             obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
-            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.1)
+            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.12)
             obstacle_list.append(obstacle1)
         # 障碍物2  
         obstacle_transform2 = Transform(Location(x=9, y=-110.350967,z=0), 
@@ -131,8 +131,8 @@ class Create_Envs(object):
     def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time,step):
         if step == 0:
             # 初始速度设定
-            ego_target_speed = carla.Vector3D(16.5,0,0)
-            npc_target_speed = carla.Vector3D(20,0,0)
+            ego_target_speed = carla.Vector3D(0,-16,0)
+            npc_target_speed = carla.Vector3D(16,0,0)
             ego.set_target_velocity(ego_target_speed)
             npc.set_target_velocity(npc_target_speed)
             # print('target velocity is set!')
@@ -157,8 +157,8 @@ class Create_Envs(object):
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
 
-            print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego_steer,ego.get_control().brake,
-                                            npc.get_control().throttle,npc_steer,npc.get_control().brake))
+            print('ego:%f,%f,%f,npc:%f,%f,%f'%(ego.get_control().throttle,ego.get_control().steer,ego.get_control().brake,
+                                            npc.get_control().throttle,npc.get_control().steer,npc.get_control().brake))
     
     # 车辆信息反馈
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor, step):
@@ -186,8 +186,8 @@ class Create_Envs(object):
         ev=-1 if ego_velocity <= 2 else 0
         nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x+10)/40 + ev + step/100
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x+10)/40 + nv + step/100
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (2)*(ego_next_transform.location.x+10)/40 + ego_velocity/10 + step/100
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (2)*(npc_next_transform.location.x+10)/40 + npc_velocity/10 + step/100
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()

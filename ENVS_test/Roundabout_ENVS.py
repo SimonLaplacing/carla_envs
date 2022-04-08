@@ -167,10 +167,10 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
+                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = npc_steer, brake = 0)
             elif npc_move < 0:
                 npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
+                npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = npc_brake)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
 
@@ -181,19 +181,15 @@ class Create_Envs(object):
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor, step):
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
-        # ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
-        # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
-        # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
-        # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
         # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
 
-        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25, 
-            (npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
+        ego_next_state = np.array([(ego_next_transform.location.x+10)/50,(ego_next_transform.location.y+30)/40,ego_next_transform.rotation.yaw/360, ego_velocity/25, 
+            (npc_next_transform.location.x+10)/50,(npc_next_transform.location.y+30)/40,npc_next_transform.rotation.yaw/360, npc_velocity/25])
             
-        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25, 
-            (ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
+        npc_next_state = np.array([(npc_next_transform.location.x+10)/50,(npc_next_transform.location.y+30)/40,npc_next_transform.rotation.yaw/360, npc_velocity/25, 
+            (ego_next_transform.location.x+10)/50,(ego_next_transform.location.y+30)/40,ego_next_transform.rotation.yaw/360, ego_velocity/25])
         
         ego_acceleration = abs(ego.get_acceleration().y)
         npc_acceleration = abs(npc.get_acceleration().y)
@@ -207,19 +203,17 @@ class Create_Envs(object):
         ev=-1 if ego_velocity <= 2 else 0
         nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + ev + step/100
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + nv + step/100
-        # ego_reward = (-20)*ego_col[0] + eb
-        # npc_reward = (-20)*npc_col[0] + nb
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration - (5)*(ego_next_transform.location.x+10)/50 + ev + step/100
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration - (5)*(npc_next_transform.location.y+30)/40 + nv + step/100
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
         # done结束状态判断
-        if ego_col[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
+        if ego_col[0]==1 or ego_next_state[0] < 0: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_col[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
+        if npc_col[0]==1 or npc_next_state[1] < 0: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
@@ -246,12 +240,12 @@ def main():
     finally:    
         # 清洗环境
         print('Start Cleaning Envs')
-        # for x in sensor_list[0]:
-        #     if x.sensor.is_alive:
-        #         x.sensor.destroy()
-        # for x in sensor_list[1]:
-        #     if x.sensor.is_alive:
-        #         x.sensor.destroy()
+        for x in sensor_list[0]:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
+        for x in sensor_list[1]:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
         for x in ego_list:
             # if x.is_alive:
             client.apply_batch([carla.command.DestroyActor(x)])

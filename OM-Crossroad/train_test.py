@@ -10,7 +10,7 @@ import torch
 
 from tensorboardX import SummaryWriter
 
-import IPPO_ENVS
+import Crossroad_ENVS as IPPO_ENVS
 from PPO_model import PPO
 
 try:
@@ -67,7 +67,7 @@ actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float()
 min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-OM-IPPO./'
+directory = './carla-OM-Crossroad./'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
@@ -89,11 +89,11 @@ def main():
             npc_transform = npc_list[0].get_transform()
             ego_velocity = ego_list[0].get_velocity().x
             npc_velocity = npc_list[0].get_velocity().x
-            ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25, 
-                (npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
+            ego_state = np.array([(ego_transform.location.x+10)/40,(ego_transform.location.y+135)/35,ego_transform.rotation.yaw/360, ego_velocity/25, 
+                (npc_transform.location.x+10)/40,(npc_transform.location.y+135)/35,npc_transform.rotation.yaw/360, npc_velocity/25])
 
-            npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25, 
-                (ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
+            npc_state = np.array([(npc_transform.location.x+10)/40,(npc_transform.location.y+135)/35,npc_transform.rotation.yaw/360, npc_velocity/25, 
+                (ego_transform.location.x+10)/40,(ego_transform.location.y+135)/35,ego_transform.rotation.yaw/360, ego_velocity/25])
 
             egosen_list = sensor_list[0]
             npcsen_list = sensor_list[1]
@@ -130,7 +130,7 @@ def main():
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward
 
-                if ego_done or npc_done: # 结束条件
+                if ego_done and npc_done: # 结束条件
                     break
 
             ego_total_reward /= t+1
