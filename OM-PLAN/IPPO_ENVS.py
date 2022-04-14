@@ -102,8 +102,9 @@ class Create_Envs(object):
         sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
         return ego_list,npc_list,obstacle_list,sensor_list
 
+    # 全局规划
     def route_positions_generate(self,start_pos,end_pos):
-        dao = GlobalRoutePlannerDAO(self.world.get_map(), sampling_resolution=2)
+        dao = GlobalRoutePlannerDAO(self.world.get_map(), sampling_resolution=4)
         grp = GlobalRoutePlanner(dao)
         grp.setup()
         self._grp = grp
@@ -119,7 +120,7 @@ class Create_Envs(object):
         return positions
 
     # 车辆控制
-    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,sim_time,step):
+    def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,step):
         if step == 0:
             # 初始速度设定
             ego_target_speed = carla.Vector3D(16.5,0,0)
@@ -152,7 +153,7 @@ class Create_Envs(object):
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,step):
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_route,npc_route,step):
 
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
@@ -161,17 +162,25 @@ class Create_Envs(object):
         # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
         # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
         # 速度、加速度
-        ego_velocity = ego.get_velocity().x
-        npc_velocity = npc.get_velocity().x
+        # ego_velocity = ego.get_velocity().x
+        # npc_velocity = npc.get_velocity().x
 
-        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25, 
-            (npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
-            
-        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25, 
-            (ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
+        ego_target_disX = ego_route.location.x - ego_next_transform.location.x
+        ego_target_disY = ego_route.location.y - ego_next_transform.location.y
+        ego_dis_x = npc_next_transform.location.x-ego_next_transform.location.x
+        ego_dis_y = npc_next_transform.location.y-ego_next_transform.location.y
+        ego_dis = np.sqrt(ego_dis_x**2+ego_dis_y**2)
+        ego_next_state = np.array([ego_target_disX,ego_target_disY,ego_dis])
+
+        npc_target_disX = npc_route.location.x - npc_next_transform.location.x
+        npc_target_disY = npc_route.location.y - npc_next_transform.location.y
+        npc_dis_x = ego_next_transform.location.x-npc_next_transform.location.x
+        npc_dis_y = ego_next_transform.location.y-npc_next_transform.location.y
+        npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
+        npc_next_state = np.array([npc_target_disX,npc_target_disY,npc_dis])
         
-        ego_acceleration = abs(ego.get_acceleration().y)
-        npc_acceleration = abs(npc.get_acceleration().y)
+        # ego_acceleration = abs(ego.get_acceleration().y)
+        # npc_acceleration = abs(npc.get_acceleration().y)
         # 碰撞、变道检测
         ego_col = ego_sensor[0].get_collision_history()
         npc_col = npc_sensor[0].get_collision_history()
@@ -179,22 +188,22 @@ class Create_Envs(object):
         # npc_inv = npc_sensor[1].get_invasion_history()
 
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
-        ev=-1 if ego_velocity <= 2 else 0
-        nv=-1 if npc_velocity <= 2 else 0
+        # ev=-1 if ego_velocity <= 2 else 0
+        # nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + ev + step/100
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + nv + step/100
+        ego_reward = (-10)*ego_col[0] + (-0.8)*ego_target_disX + (-1)*ego_target_disY + (0.1)*ego_dis - step/200
+        npc_reward = (-10)*npc_col[0] + (-0.8)*npc_target_disX + (-1)*npc_target_disY + (0.1)*npc_dis - step/200
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
         # done结束状态判断
-        if ego_col[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
+        if ego_col[0]==1 or (ego_next_transform.location.x-120)/125 > 1: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_col[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
+        if npc_col[0]==1 or (npc_next_transform.location.x-120)/125 > 1: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
@@ -207,5 +216,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0,0,0] # ego_x,y,yaw,velocity;npc_x,y,yaw,velocity;
+        state_space = [0,0,0] # ego_x,y,yaw,velocity;npc_x,y,yaw,velocity;
         return state_space

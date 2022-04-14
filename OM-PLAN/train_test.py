@@ -10,6 +10,7 @@ import IPPO_ENVS
 from PPO_model import PPO
 
 import carla
+import misc
 
 
 
@@ -55,7 +56,7 @@ actor_num = 2
 max_action = torch.tensor(action_space[...,1]).float()
 min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-OM-IPPO./'
+directory = './carla-PLAN./'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
@@ -74,26 +75,27 @@ def main():
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             egosen_list = sensor_list[0]
             npcsen_list = sensor_list[1]
-            ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, 0)
+            if args.synchronous_mode:
+                world.tick() # 客户端主导，tick
+            else:
+                world.wait_for_tick() # 服务器主导，tick
             ego_transform = ego_list[0].get_transform()
             npc_transform = npc_list[0].get_transform()
-            # ego_velocity = ego_list[0].get_velocity().x
-            # npc_velocity = npc_list[0].get_velocity().x
-            # ego_state = np.array([(ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25, 
-            #     (npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25])
-            # npc_state = np.array([(npc_transform.location.x-200)/125,(npc_transform.location.y+375)/4,npc_transform.rotation.yaw/90, npc_velocity/25, 
-            #     (ego_transform.location.x-200)/125,(ego_transform.location.y+375)/4,ego_transform.rotation.yaw/90, ego_velocity/25])
-
+            
             # 全局路径
             ego_start_location = ego_transform.location
-            ego_end_location = ego_transform.location + carla.Location(x=135,y=-3.5)
+            ego_end_location = ego_transform.location + carla.Location(x=135,y=0)
             ego_route = create_envs.route_positions_generate(ego_start_location,ego_end_location)
+            misc.draw_waypoints(world,ego_route)
 
             npc_start_location = npc_transform.location
             npc_end_location = npc_transform.location + carla.Location(x=135)
             npc_route = create_envs.route_positions_generate(npc_start_location,npc_end_location)
-            # print(ego_route[3].location.x)
+            misc.draw_waypoints(world,npc_route)
+
             ego_step, npc_step = 0, 0
+            ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], 0)
+            
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
                 if args.mode == 'test':
@@ -103,7 +105,7 @@ def main():
                     ego_action = ego_PPO.select_action(ego_state,npc_state)
                     npc_action = npc_PPO.select_action(npc_state,npc_state)
                 
-                create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, args.fixed_delta_seconds, t)
+                create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, t)
                 #---------和环境交互动作反馈---------
                 frames = 1 # 步长 
                 if args.synchronous_mode:
@@ -111,14 +113,15 @@ def main():
                         world.tick() # 客户端主导，tick
                 else:
                     world.wait_for_tick() # 服务器主导，tick
-
-                if ego_route[ego_step].location.x - ego_transform.location.x < 0.2:
-                    ego_step += 1
-                if npc_route[ego_step].location.x - npc_transform.location.x < 0.2:
-                    npc_step += 1
+                # print('step:',ego_step)
                     
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, t)
-
+                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], t)
+                
+                if ego_next_state[0] < 0.5:
+                    ego_step += 1
+                if npc_next_state[0] < 0.5:
+                    npc_step += 1
+                print('state: ', ego_next_state)
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
                 ego_PPO.buffer.is_terminals.append(ego_done)
