@@ -158,24 +158,22 @@ class Create_Envs(object):
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
         # 速度、加速度
-        ego_velocity = ego.get_velocity()
-        npc_velocity = npc.get_velocity()
-        ego_yaw = ego_next_transform.rotation.yaw
-        npc_yaw = npc_next_transform.rotation.yaw
+        # ego_velocity = ego.get_velocity().x
+        # npc_velocity = npc.get_velocity().x
 
         ego_target_disX = ego_route.location.x - ego_next_transform.location.x
         ego_target_disY = ego_route.location.y - ego_next_transform.location.y
         ego_dis_x = npc_next_transform.location.x-ego_next_transform.location.x
         ego_dis_y = npc_next_transform.location.y-ego_next_transform.location.y
         ego_dis = np.sqrt(ego_dis_x**2+ego_dis_y**2)
-        ego_next_state = np.array([ego_target_disX,ego_target_disY,ego_dis_x,ego_dis_y,ego_velocity.x,ego_velocity.y,ego_yaw,npc_velocity.x,npc_velocity.y,npc_yaw])
+        ego_next_state = np.array([ego_target_disX,ego_target_disY,ego_dis_x,ego_dis_y])
 
         npc_target_disX = npc_route.location.x - npc_next_transform.location.x
         npc_target_disY = npc_route.location.y - npc_next_transform.location.y
         npc_dis_x = ego_next_transform.location.x-npc_next_transform.location.x
         npc_dis_y = ego_next_transform.location.y-npc_next_transform.location.y
         npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-        npc_next_state = np.array([npc_target_disX,npc_target_disY,npc_dis_x,npc_dis_y,npc_velocity.x,npc_velocity.y,npc_yaw,ego_velocity.x,ego_velocity.y,ego_yaw])
+        npc_next_state = np.array([npc_target_disX,npc_target_disY,npc_dis_x,npc_dis_y])
         
         # ego_acceleration = abs(ego.get_acceleration().y)
         # npc_acceleration = abs(npc.get_acceleration().y)
@@ -209,10 +207,10 @@ class Create_Envs(object):
 
     # 车辆动作空间
     def get_action_space(self):
-        action_space = [0,0] # 油门、方向盘、刹车,油门刹车合并
+        action_space = np.array([[-1,1],[-1,1]],dtype=np.float16) # 油门、方向盘、刹车,油门刹车合并
         return action_space
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0,0,0,0,0]
+        state_space = [0,0,0,0]
         return state_space

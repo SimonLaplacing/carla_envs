@@ -53,10 +53,10 @@ state_space = create_envs.get_state_space()
 state_dim = len(state_space)
 action_dim = len(action_space)
 actor_num = 2
-# max_action = torch.tensor(action_space[...,1]).float()
-# min_action = torch.tensor(action_space[...,0]).float()
+max_action = torch.tensor(action_space[...,1]).float()
+min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-Position/'
+directory = './carla-PLAN./'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
