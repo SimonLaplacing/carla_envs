@@ -24,7 +24,7 @@ parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习
 parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
@@ -32,7 +32,7 @@ parser.add_argument('--update_interval', default=15, type=int) # 网络更新间
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
 parser.add_argument('--max_episode', default=1800, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 5, type=int) # 网络迭代次数
+parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 # script_name = os.path.basename(__file__)
@@ -56,7 +56,7 @@ actor_num = 2
 # max_action = torch.tensor(action_space[...,1]).float()
 # min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-Position/'
+directory = './carla-Plan/'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
