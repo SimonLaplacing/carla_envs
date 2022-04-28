@@ -142,10 +142,10 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
+                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = npc_steer, brake = 0)
             elif npc_move < 0:
                 npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
+                npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = npc_brake)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
 
@@ -153,8 +153,9 @@ class Create_Envs(object):
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_route,npc_route,step):
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_route,npc_route,extra_reward):
 
+        ego_extra, npc_extra = extra_reward
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
         # 速度、加速度
@@ -191,8 +192,8 @@ class Create_Envs(object):
         # ev=-1 if ego_velocity <= 2 else 0
         # nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-5)*ego_col[0] + (-1)*ego_target_disX + (-2)*ego_target_disY + (0.01)*ego_dis - step/500
-        npc_reward = (-5)*npc_col[0] + (-1)*npc_target_disX + (-2)*npc_target_disY + (0.01)*npc_dis - step/500
+        ego_reward = (-5)*ego_col[0] + (-1)*ego_target_disX + (-2)*ego_target_disY + (0.01)*ego_dis + ego_extra
+        npc_reward = (-5)*npc_col[0] + (-1)*npc_target_disX + (-2)*npc_target_disY + (0.01)*npc_dis + npc_extra
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()

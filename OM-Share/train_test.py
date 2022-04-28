@@ -31,7 +31,7 @@ parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=1800, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=2500, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -56,7 +56,7 @@ actor_num = 2
 # max_action = torch.tensor(action_space[...,1]).float()
 # min_action = torch.tensor(action_space[...,0]).float()
 
-directory = './carla-Plan/'
+directory = './carla-Share/'
 
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
@@ -95,7 +95,8 @@ def main():
             misc.draw_waypoints(world,npc_route)
 
             ego_step, npc_step = 0, 0
-            ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], 0)
+            ego_extra,npc_extra = 0, 0
+            ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], [0,0])
             
             for t in range(args.max_length_of_trajectory):
                 #---------动作决策----------
@@ -116,12 +117,14 @@ def main():
                     world.wait_for_tick() # 服务器主导，tick
                 # print('step:',ego_step)
                     
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], t)
-                
+                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], [ego_extra,npc_extra])
+                ego_extra,npc_extra = 0, 0
                 if ego_next_state[0] < 0.5:
                     ego_step += 1
+                    ego_extra = 1
                 if npc_next_state[0] < 0.5:
                     npc_step += 1
+                    npc_extra = 1
                 # print('state: ', ego_next_state)
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
@@ -174,6 +177,7 @@ def main():
             for x in obstacle_list:
                 # if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
+            del ego_list, npc_list, obstacle_list, sensor_list, egosen_list, npcsen_list, ego_route, npc_route
             print('Reset')
 
     finally:
