@@ -31,7 +31,7 @@ parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=500, type=int) # 网络更新step间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=2500, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
 args = parser.parse_args()
 
@@ -59,17 +59,16 @@ actor_num = 2
 directory = './carla-Share/'
 
 def main():
-    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.8)
-    # npc_PPO = ego_PPO
-    npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.8)
+    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1.5)
+    npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1.5)
     client, world, blueprint_library = create_envs.connection()
     main_writer = SummaryWriter(directory)
-
+    count = 0
     try:
         if args.load or args.mode == 'test': 
             ego_PPO.load(directory + 'ego.pkl')
             npc_PPO.load(directory + 'npc.pkl')
-            count = 0
+            
         for i in range(args.max_episode):
             ego_total_reward = 0
             npc_total_reward = 0
@@ -122,10 +121,10 @@ def main():
                 ego_extra,npc_extra = 0, 0
                 if ego_next_state[0] < 0.5:
                     ego_step += 1
-                    ego_extra = 3
+                    ego_extra = 1
                 if npc_next_state[0] < 0.5:
                     npc_step += 1
-                    npc_extra = 3
+                    npc_extra = 1
                 # print('state: ', ego_next_state)
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
