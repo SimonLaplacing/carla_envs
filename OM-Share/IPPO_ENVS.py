@@ -192,8 +192,8 @@ class Create_Envs(object):
         # ev=-1 if ego_velocity <= 2 else 0
         # nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-5)*ego_col[0] + (-1)*ego_target_disX + (-2)*ego_target_disY + (0.01)*ego_dis + ego_extra
-        npc_reward = (-5)*npc_col[0] + (-1)*npc_target_disX + (-2)*npc_target_disY + (0.01)*npc_dis + npc_extra
+        ego_reward = (-5)*ego_col[0] + (-1)*ego_target_disX + (-3)*ego_target_disY + (0.01)*ego_dis + ego_extra
+        npc_reward = (-5)*npc_col[0] + (-1)*npc_target_disX + (-3)*npc_target_disY + (0.01)*npc_dis + npc_extra
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()

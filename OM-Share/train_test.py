@@ -21,18 +21,18 @@ parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
 parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
 parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.95, type=int) # discounted factor
+parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
-parser.add_argument('--update_interval', default=15, type=int) # 网络更新间隔
+parser.add_argument('--update_interval', default=500, type=int) # 网络更新step间隔
 parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2500, type=int) # 仿真次数
-parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
+parser.add_argument('--max_episode', default=2000, type=int) # 仿真次数
+parser.add_argument('--update_iteration', default = 8, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 # script_name = os.path.basename(__file__)
@@ -59,9 +59,9 @@ actor_num = 2
 directory = './carla-Share/'
 
 def main():
-    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
-    npc_PPO = ego_PPO
-    # npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.6)
+    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.8)
+    # npc_PPO = ego_PPO
+    npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=0.8)
     client, world, blueprint_library = create_envs.connection()
     main_writer = SummaryWriter(directory)
 
@@ -69,6 +69,7 @@ def main():
         if args.load or args.mode == 'test': 
             ego_PPO.load(directory + 'ego.pkl')
             npc_PPO.load(directory + 'npc.pkl')
+            count = 0
         for i in range(args.max_episode):
             ego_total_reward = 0
             npc_total_reward = 0
@@ -121,17 +122,17 @@ def main():
                 ego_extra,npc_extra = 0, 0
                 if ego_next_state[0] < 0.5:
                     ego_step += 1
-                    ego_extra = 1
+                    ego_extra = 3
                 if npc_next_state[0] < 0.5:
                     npc_step += 1
-                    npc_extra = 1
+                    npc_extra = 3
                 # print('state: ', ego_next_state)
                 # 数据储存
                 ego_PPO.buffer.rewards.append(ego_reward)
                 ego_PPO.buffer.is_terminals.append(ego_done)
                 npc_PPO.buffer.rewards.append(npc_reward)
                 npc_PPO.buffer.is_terminals.append(npc_done)
-
+                count += 1
                 ego_state = ego_next_state
                 npc_state = npc_next_state
                 
@@ -149,13 +150,14 @@ def main():
             print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
             
             if args.mode == 'train':    
-                if i > 0 and (i+1) % args.update_interval == 0:
+                if i > 0 and (count+1) >= args.update_interval:
                     ego_PPO.update(npc_PPO)
                     print('ego_updated')
                     npc_PPO.update(ego_PPO)
                     print('npc_updated')
                     ego_PPO.clear()
                     npc_PPO.clear()
+                    count = 0
                     
                 if i > 0 and (i+1) % args.log_interval == 0:
                     ego_PPO.save(directory + 'ego.pkl')
