@@ -56,9 +56,9 @@ class Actor(nn.Module):
         return mu, sigma
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim + action_dim, 128)
+        self.fc1 = nn.Linear(state_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.state_value= nn.Linear(64, 1)
 
@@ -109,7 +109,7 @@ class ActorCritic(nn.Module):
                             nn.Softmax(dim=-1)
                         )
         # critic
-        self.critic = Critic(state_dim,action_dim)
+        self.critic = Critic(state_dim)
 
         # om
         self.om = OM(state_dim, action_dim, action_std_init)
@@ -191,7 +191,7 @@ class ActorCritic(nn.Module):
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
-        state_values = self.critic(state,action)
+        state_values = self.critic(state)
         
         return action_logprobs, state_values, dist_entropy
 

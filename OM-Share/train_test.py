@@ -138,7 +138,7 @@ def main():
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward
 
-                if ego_done or npc_done: # 结束条件
+                if ego_done and npc_done: # 结束条件
                     break
 
             ego_total_reward /= t+1
