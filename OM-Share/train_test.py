@@ -12,7 +12,7 @@ from PPO_model import PPO
 import carla
 from carla import Transform, Location, Rotation
 import misc
-
+import random
 
 
 parser = argparse.ArgumentParser()
@@ -63,23 +63,12 @@ def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
     npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
     client, world, blueprint_library = create_envs.connection()
-    main_writer = SummaryWriter(directory)
+    main_writer = SummaryWriter(directory + '/' + str(random.randint(0,1000)))
     count = 0
     try:
         if args.load or args.mode == 'test': 
             ego_PPO.load(directory + 'ego.pkl')
             npc_PPO.load(directory + 'npc.pkl')
-            
-        # 全局路径
-        ego_start_location =  Location(x=160.341522, y=-371.640472, z=0.281942)
-        ego_end_location = ego_start_location + Location(x=135)
-        ego_route = create_envs.route_positions_generate(ego_start_location,ego_end_location)
-        misc.draw_waypoints(world,ego_route)
-
-        npc_start_location = ego_start_location + Location(x=-15,y=-3.5)
-        npc_end_location = npc_start_location + Location(x=135)
-        npc_route = create_envs.route_positions_generate(npc_start_location,npc_end_location)
-        misc.draw_waypoints(world,npc_route)
 
         for i in range(args.max_episode):
             ego_total_reward = 0
@@ -95,6 +84,18 @@ def main():
             ego_transform = ego_list[0].get_transform()
             npc_transform = npc_list[0].get_transform()
 
+            if i == 0:
+                # 全局路径
+                ego_start_location = ego_transform.location
+                ego_end_location = ego_transform.location + carla.Location(x=135,y=0)
+                ego_route = create_envs.route_positions_generate(ego_start_location,ego_end_location)
+                misc.draw_waypoints(world,ego_route)
+
+                npc_start_location = npc_transform.location
+                npc_end_location = npc_transform.location + carla.Location(x=135)
+                npc_route = create_envs.route_positions_generate(npc_start_location,npc_end_location)
+                misc.draw_waypoints(world,npc_route)
+
             ego_step, npc_step = 0, 0
             ego_extra,npc_extra = 0, 0
             ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], [0,0])
@@ -103,10 +104,10 @@ def main():
                 #---------动作决策----------
                 if args.mode == 'test':
                     ego_action = ego_PPO.select_best_action(ego_state,npc_state)
-                    npc_action = npc_PPO.select_best_action(npc_state,npc_state)
+                    npc_action = npc_PPO.select_best_action(npc_state,ego_state)
                 else:
                     ego_action = ego_PPO.select_action(ego_state,npc_state)
-                    npc_action = npc_PPO.select_action(npc_state,npc_state)
+                    npc_action = npc_PPO.select_action(npc_state,ego_state)
                 
                 create_envs.set_vehicle_control(ego_list[0], npc_list[0], ego_action, npc_action, args.c_tau, t)
                 #---------和环境交互动作反馈---------
@@ -120,10 +121,10 @@ def main():
                     
                 ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], [ego_extra,npc_extra])
                 ego_extra,npc_extra = 0, 0
-                if ego_next_state[0] < 0.1:
+                if ego_next_state[0] < 0.15:
                     ego_step += 1
                     ego_extra = 1
-                if npc_next_state[0] < 0.1:
+                if npc_next_state[0] < 0.15:
                     npc_step += 1
                     npc_extra = 1
                 # print('state: ', ego_next_state)
@@ -132,7 +133,7 @@ def main():
                 count += 1
                 ego_state = ego_next_state
                 npc_state = npc_next_state
-                
+                print('ego_state: ', ego_state, 'npc_state: ', npc_state)
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward
                 ego_PPO.buffer.rewards.append(ego_reward)
@@ -148,14 +149,17 @@ def main():
                         npc_PPO.buffer.is_terminals.append(True)
                         break
                     else:
-                        ego_PPO.buffer.is_terminals.append(ego_done)
-                        npc_PPO.buffer.is_terminals.append(npc_done)
+                        ego_PPO.buffer.is_terminals.append(False)
+                        npc_PPO.buffer.is_terminals.append(False)
 
 
             ego_total_reward /= t+1
             npc_total_reward /= t+1
             main_writer.add_scalar('reward/ego_reward', ego_total_reward, global_step=i)
             main_writer.add_scalar('reward/npc_reward', npc_total_reward, global_step=i)
+            main_writer.add_scalar('step/step', t+1, global_step=i)
+            main_writer.add_scalar('offset/ego_offsety', ego_state[1], global_step=i)
+            main_writer.add_scalar('offset/npc_offsety', npc_state[1], global_step=i)
 
             print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(i+1, t, ego_total_reward, npc_total_reward))
             
