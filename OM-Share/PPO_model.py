@@ -121,6 +121,7 @@ class ActorCritic(nn.Module):
     def act(self, state, opponent_state):
         if self.has_continuous_action_space:
             pre_mean, pre_sigma = self.om(opponent_state)
+            # print('sigma: ', pre_sigma)
             pre_var = pre_sigma ** 2
             pre_var = pre_var.repeat(1,2).to(device)
             pre_mat = torch.diag_embed(pre_var).to(device)

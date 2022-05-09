@@ -10,12 +10,13 @@ import IPPO_ENVS
 from PPO_model import PPO
 
 import carla
+from carla import Transform, Location, Rotation
 import misc
 
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
@@ -59,8 +60,8 @@ actor_num = 2
 directory = './carla-Share/'
 
 def main():
-    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1.5)
-    npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1.5)
+    ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
+    npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
     client, world, blueprint_library = create_envs.connection()
     main_writer = SummaryWriter(directory)
     count = 0
@@ -69,6 +70,17 @@ def main():
             ego_PPO.load(directory + 'ego.pkl')
             npc_PPO.load(directory + 'npc.pkl')
             
+        # 全局路径
+        ego_start_location =  Location(x=160.341522, y=-371.640472, z=0.281942)
+        ego_end_location = ego_start_location + Location(x=135)
+        ego_route = create_envs.route_positions_generate(ego_start_location,ego_end_location)
+        misc.draw_waypoints(world,ego_route)
+
+        npc_start_location = ego_start_location + Location(x=-15,y=-3.5)
+        npc_end_location = npc_start_location + Location(x=135)
+        npc_route = create_envs.route_positions_generate(npc_start_location,npc_end_location)
+        misc.draw_waypoints(world,npc_route)
+
         for i in range(args.max_episode):
             ego_total_reward = 0
             npc_total_reward = 0
@@ -82,17 +94,6 @@ def main():
                 world.wait_for_tick() # 服务器主导，tick
             ego_transform = ego_list[0].get_transform()
             npc_transform = npc_list[0].get_transform()
-            
-            # 全局路径
-            ego_start_location = ego_transform.location
-            ego_end_location = ego_transform.location + carla.Location(x=135,y=0)
-            ego_route = create_envs.route_positions_generate(ego_start_location,ego_end_location)
-            misc.draw_waypoints(world,ego_route)
-
-            npc_start_location = npc_transform.location
-            npc_end_location = npc_transform.location + carla.Location(x=135)
-            npc_route = create_envs.route_positions_generate(npc_start_location,npc_end_location)
-            misc.draw_waypoints(world,npc_route)
 
             ego_step, npc_step = 0, 0
             ego_extra,npc_extra = 0, 0
@@ -119,27 +120,37 @@ def main():
                     
                 ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], [ego_extra,npc_extra])
                 ego_extra,npc_extra = 0, 0
-                if ego_next_state[0] < 0.5:
+                if ego_next_state[0] < 0.1:
                     ego_step += 1
                     ego_extra = 1
-                if npc_next_state[0] < 0.5:
+                if npc_next_state[0] < 0.1:
                     npc_step += 1
                     npc_extra = 1
                 # print('state: ', ego_next_state)
                 # 数据储存
-                ego_PPO.buffer.rewards.append(ego_reward)
-                ego_PPO.buffer.is_terminals.append(ego_done)
-                npc_PPO.buffer.rewards.append(npc_reward)
-                npc_PPO.buffer.is_terminals.append(npc_done)
+                
                 count += 1
                 ego_state = ego_next_state
                 npc_state = npc_next_state
                 
                 ego_total_reward += ego_reward
                 npc_total_reward += npc_reward
+                ego_PPO.buffer.rewards.append(ego_reward)
+                npc_PPO.buffer.rewards.append(npc_reward)
 
-                if ego_done and npc_done: # 结束条件
-                    break
+                if args.mode == 'test':
+                    if ego_done and npc_done:
+                        break
+
+                if args.mode == 'train':
+                    if ego_done or npc_done: # 结束条件
+                        ego_PPO.buffer.is_terminals.append(True)
+                        npc_PPO.buffer.is_terminals.append(True)
+                        break
+                    else:
+                        ego_PPO.buffer.is_terminals.append(ego_done)
+                        npc_PPO.buffer.is_terminals.append(npc_done)
+
 
             ego_total_reward /= t+1
             npc_total_reward /= t+1
@@ -178,7 +189,7 @@ def main():
             for x in obstacle_list:
                 # if x.is_alive:
                 client.apply_batch([carla.command.DestroyActor(x)])
-            del ego_list, npc_list, obstacle_list, sensor_list, egosen_list, npcsen_list, ego_route, npc_route
+            del ego_list, npc_list, obstacle_list, sensor_list, egosen_list, npcsen_list
             print('Reset')
 
     finally:
