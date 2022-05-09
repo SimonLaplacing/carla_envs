@@ -15,7 +15,7 @@ import misc
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数

@@ -62,8 +62,8 @@ class Critic(nn.Module):
         self.fc2 = nn.Linear(128, 64)
         self.state_value= nn.Linear(64, 1)
 
-    def forward(self, s, u):
-        x = torch.cat([s,u],-1)
+    def forward(self, x):
+        # x = torch.cat([s,-1)
         x = F.leaky_relu(self.fc1(x))
         x = F.leaky_relu(self.fc2(x))
         value = self.state_value(x)
