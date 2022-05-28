@@ -10,16 +10,7 @@
 
 import math
 import numpy as np
-import sys
-import glob
-import os
-try:
-    sys.path.append(glob.glob('D:/CARLA_0.9.11/WindowsNoEditor/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
-        sys.version_info.major,
-        sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-except IndexError:
-    pass
+
 import carla
 
 def draw_waypoints(world, waypoints, z=0.5):

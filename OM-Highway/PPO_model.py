@@ -56,14 +56,14 @@ class Actor(nn.Module):
         return mu, sigma
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim + action_dim, 128)
+        self.fc1 = nn.Linear(state_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.state_value= nn.Linear(64, 1)
 
-    def forward(self, s, u):
-        x = torch.cat([s,u],-1)
+    def forward(self, x):
+        # x = torch.cat([s,-1)
         x = F.leaky_relu(self.fc1(x))
         x = F.leaky_relu(self.fc2(x))
         value = self.state_value(x)
@@ -109,7 +109,7 @@ class ActorCritic(nn.Module):
                             nn.Softmax(dim=-1)
                         )
         # critic
-        self.critic = Critic(state_dim,action_dim)
+        self.critic = Critic(state_dim)
 
         # om
         self.om = OM(state_dim, action_dim, action_std_init)
@@ -121,6 +121,7 @@ class ActorCritic(nn.Module):
     def act(self, state, opponent_state):
         if self.has_continuous_action_space:
             pre_mean, pre_sigma = self.om(opponent_state)
+            # print('sigma: ', pre_sigma)
             pre_var = pre_sigma ** 2
             pre_var = pre_var.repeat(1,2).to(device)
             pre_mat = torch.diag_embed(pre_var).to(device)
@@ -191,7 +192,7 @@ class ActorCritic(nn.Module):
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
-        state_values = self.critic(state,action)
+        state_values = self.critic(state)
         
         return action_logprobs, state_values, dist_entropy
 
@@ -312,8 +313,8 @@ class PPO:
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # final loss of clipped objective PPO
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy + 0.5 * self.MseLoss(old_actions, old_pre_actions)
-            
+            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy + 0.5*self.MseLoss(old_pre_actions, old_actions)
+            # print('loss: ', -torch.min(surr1, surr2).mean().item(), 0.5*self.MseLoss(state_values, rewards).mean().item(), - 0.01*dist_entropy.mean().item(), 0.5*self.MseLoss(old_actions, old_pre_actions).mean().item())
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
@@ -321,6 +322,7 @@ class PPO:
             
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
+        return loss.mean().item()
 
     def clear(self):
         self.buffer.clear()

@@ -313,8 +313,8 @@ class PPO:
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # final loss of clipped objective PPO
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy + 0.5 * self.MseLoss(old_actions, old_pre_actions)
-            
+            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy + 0.5*self.MseLoss(old_pre_actions, old_actions)
+            # print('loss: ', -torch.min(surr1, surr2).mean().item(), 0.5*self.MseLoss(state_values, rewards).mean().item(), - 0.01*dist_entropy.mean().item(), 0.5*self.MseLoss(old_actions, old_pre_actions).mean().item())
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
@@ -322,6 +322,7 @@ class PPO:
             
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
+        return loss.mean().item()
 
     def clear(self):
         self.buffer.clear()
