@@ -194,9 +194,9 @@ class Create_Envs(object):
         ego_dis_x = (npc_next_transform.location.x-ego_next_transform.location.x)
         ego_dis_y = (npc_next_transform.location.y-ego_next_transform.location.y)
         ego_dis = np.sqrt(ego_dis_x**2+ego_dis_y**2)
-        ego_ob_x = (obstacle_next_transform.location.x-ego_next_transform.location.x)
+        # ego_ob_x = (obstacle_next_transform.location.x-ego_next_transform.location.x)
         ego_ob_y = (obstacle_next_transform.location.y-ego_next_transform.location.y)
-        ego_ob = np.sqrt(ego_ob_x**2+ego_ob_y**2)
+        # ego_ob = np.sqrt(ego_ob_x**2+ego_ob_y**2)
 
         ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_dis_x/20,ego_dis_y/20,ego_ob_y/25,
             ego_vec[0]/30,ego_vec[1]/30,np.sin(ego_yaw/2),npc_vec[0]/30,npc_vec[1]/30,np.sin(npc_yaw/2)])
@@ -207,9 +207,9 @@ class Create_Envs(object):
         npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
         npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
         npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-        npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
+        # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
         npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-        npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
+        # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
 
         npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_dis_x/20,npc_dis_y/20,npc_ob_y/2,
             npc_vec[0]/30,npc_vec[1]/30,np.sin(npc_yaw/2),ego_vec[0]/30,ego_vec[1]/30,np.sin(ego_yaw/2)])
@@ -232,23 +232,40 @@ class Create_Envs(object):
         if npc_target_disX > -0.5:
             npc_bonus += 1
 
-        ego_reward = (-80)*ego_col[0] + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (0.001)*(ego_dis) + 30*ego_bonus - 0.001*step
-        npc_reward = (-80)*npc_col[0] + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (0.001)*(npc_dis) + 30*npc_bonus - 0.001*step
+        ego_reward = (-20)*ego_col[0] + (-1.5)*(ego_target_disX/5)**2 + (-3)*(ego_target_disY/10)**2 + (0.0002)*(ego_dis) + 6*ego_bonus - 0.0002*step
+        npc_reward = (-20)*npc_col[0] + (-1.5)*(npc_target_disX/5)**2 + (-3)*(npc_target_disY/10)**2 + (0.0002)*(npc_dis) + 6*npc_bonus - 0.0002*step
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
         # done结束状态判断
-        if ego_col[0]==1 or ego_step == ego_num - 1: # ego结束条件ego_done
+        if ego_col[0]==1: # ego结束条件ego_done
             ego_done = True
+            egocol_num = 1
+            ego_finish = 0
+        elif ego_step == ego_num - 1:
+            ego_done = True
+            egocol_num = 0
+            ego_finish = 1
         else:
             ego_done = False
-        if npc_col[0]==1 or npc_step == npc_num - 1: # npc结束条件npc_done
+            egocol_num = 0
+            ego_finish = 0
+
+        if npc_col[0]==1: # npc结束条件npc_done
             npc_done = True
+            npccol_num = 1
+            npc_finish = 0
+        elif npc_step == npc_num - 1:
+            npc_done = True
+            npccol_num = 0
+            npc_finish = 1
         else:
-            npc_done = False  
-        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done]
+            npc_done = False
+            npccol_num = 0
+            npc_finish = 0  
+        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol_num,ego_finish,npccol_num,npc_finish]
 
     # 车辆动作空间
     def get_action_space(self):

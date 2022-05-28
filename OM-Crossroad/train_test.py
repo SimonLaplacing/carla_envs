@@ -18,13 +18,13 @@ import random
 parser = argparse.ArgumentParser()
 # parser.add_argument('--env', type=str, default='highway')
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--load_seed', default=10000, type=str) # seed
+parser.add_argument('--load_seed', default=6964, type=str) # seed
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
-parser.add_argument('--Alearning_rate', default=5e-6, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=8e-6, type=float) # Critic学习率
-parser.add_argument('--gamma', default=0.995, type=int) # discounted factor
+parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
+parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
+parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
 parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
@@ -72,8 +72,8 @@ def main():
     count = 0
     try:
         if args.load or args.mode == 'test': 
-            ego_PPO.load(directory + '/' + args.mode + str(args.load_seed) + '/' + 'ego.pkl')
-            npc_PPO.load(directory + '/' + args.mode + str(args.load_seed) + '/' + 'npc.pkl')
+            ego_PPO.load(directory + '/' + 'train' + str(args.load_seed) + '/' + 'ego.pkl')
+            npc_PPO.load(directory + '/' + 'train' + str(args.load_seed) + '/' + 'npc.pkl')
 
         for i in range(args.max_episode):
             ego_total_reward = 0
@@ -82,6 +82,10 @@ def main():
             npc_offsetx = 0
             ego_offsety = 0
             npc_offsety = 0
+            # egocol_num = 0
+            # ego_finish = 0
+            # npccol_num = 0
+            # npc_finish = 0
             print('------------%dth time learning begins-----------'%i)
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             egosen_list = sensor_list[0]
@@ -111,7 +115,7 @@ def main():
 
             ego_step, npc_step = 1, 1
             # print(len(ego_route),len(npc_route),len(obstacle_list),len(ego_list),len(npc_list))
-            ego_state,_,_,npc_state,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], obstacle_list[0], ego_step, npc_step, ego_num, npc_num, 0)
+            ego_state,_,_,npc_state,_,_,_,_,_,_ = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], obstacle_list[0], ego_step, npc_step, ego_num, npc_num, 0)
             
             for t in range(99999):
                 #---------动作决策----------
@@ -132,7 +136,7 @@ def main():
                 # print('step:',ego_step)
 
                      
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], obstacle_list[0], ego_step, npc_step, ego_num, npc_num, t)
+                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol,ego_fin,npccol,npc_fin = create_envs.get_vehicle_step(ego_list[0], npc_list[0], egosen_list, npcsen_list, ego_route[ego_step], npc_route[npc_step], obstacle_list[0], ego_step, npc_step, ego_num, npc_num, t)
                 # print('ego_next_state:',ego_next_state,'\n','npc_next_state:',npc_next_state)
                 # ego_transform = ego_list[0].get_transform()
                 # print(ego_transform,'\n',ego_route[ego_step])
@@ -186,7 +190,11 @@ def main():
                 main_writer.add_scalar('offset/ego_offsetx', ego_offsetx/(t+1), global_step=i)
                 main_writer.add_scalar('offset/ego_offsety', ego_offsety/(t+1), global_step=i)
                 main_writer.add_scalar('offset/npc_offsetx', npc_offsetx/(t+1), global_step=i)
-                main_writer.add_scalar('offset/npc_offsety', npc_offsety/(t+1), global_step=i)    
+                main_writer.add_scalar('offset/npc_offsety', npc_offsety/(t+1), global_step=i)
+                main_writer.add_scalar('rate/ego_col', egocol, global_step=i)
+                main_writer.add_scalar('rate/npc_col', npccol, global_step=i)
+                main_writer.add_scalar('rate/ego_finish', ego_fin, global_step=i)
+                main_writer.add_scalar('rate/npc_finsh', npc_fin, global_step=i)    
                 
                 if args.mode == 'train':
                     if i > 0 and (count+1) >= args.update_interval:
