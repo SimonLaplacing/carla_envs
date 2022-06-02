@@ -79,9 +79,9 @@ class Create_Envs(object):
         # 障碍物1
         obstacle_transform1 = Transform(Location(x=9, y=-110.350967,z=0), 
                     Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform1.location += carla.Location(x=50,y=-25,z=3)
+        obstacle_transform1.location += carla.Location(x=50,y=-27,z=3)
         obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        for i in range(30):
+        for i in range(10):
             obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
             obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.12)
             obstacle_list.append(obstacle1)
@@ -232,8 +232,8 @@ class Create_Envs(object):
         if npc_target_disX > -0.5:
             npc_bonus += 1
 
-        ego_reward = (-20)*ego_col[0] + (-1.5)*(ego_target_disX/5)**2 + (-3)*(ego_target_disY/10)**2 + (0.0002)*(ego_dis) + 6*ego_bonus - 0.0002*step
-        npc_reward = (-20)*npc_col[0] + (-1.5)*(npc_target_disX/5)**2 + (-3)*(npc_target_disY/10)**2 + (0.0002)*(npc_dis) + 6*npc_bonus - 0.0002*step
+        ego_reward = (-60)*ego_col[0] + (-3)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-10)*np.abs(np.sin(ego_yaw/2)) + (0.002)*(ego_dis) + 30*ego_bonus - 0.0008*step
+        npc_reward = (-60)*npc_col[0] + (-3)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-10)*np.abs(np.sin(npc_yaw/2)) + (0.002)*(npc_dis) + 30*npc_bonus - 0.0008*step
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()

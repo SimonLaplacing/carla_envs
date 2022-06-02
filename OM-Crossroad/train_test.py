@@ -18,7 +18,7 @@ import random
 parser = argparse.ArgumentParser()
 # parser.add_argument('--env', type=str, default='highway')
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--load_seed', default=6964, type=str) # seed
+parser.add_argument('--load_seed', default=4684, type=str) # seed
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
