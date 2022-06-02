@@ -1,15 +1,13 @@
 import psutil
- 
+import os
+
 def judgeprocess(processname):
     pl = psutil.pids()
     for pid in pl:
         if psutil.Process(pid).name() == processname:
-            print(pid)
-            break
+            return True
     else:
-        print("not found")
+        return False
         
-if judgeprocess('carla.exe') == 0:
-    print('success')
-else:
-    pass
+if judgeprocess('CarlaUE4.exe') == False:
+    os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
