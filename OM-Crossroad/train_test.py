@@ -18,12 +18,12 @@ import random
 parser = argparse.ArgumentParser()
 # parser.add_argument('--env', type=str, default='highway')
 parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-parser.add_argument('--load_seed', default=4684, type=str) # seed
+parser.add_argument('--load_seed', default=3765, type=str) # seed
 
 parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
-parser.add_argument('--Alearning_rate', default=1e-5, type=float) # Actor学习率
-parser.add_argument('--Clearning_rate', default=5e-5, type=float) # Critic学习率
+parser.add_argument('--Alearning_rate', default=2e-5, type=float) # Actor学习率
+parser.add_argument('--Clearning_rate', default=8e-5, type=float) # Critic学习率
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
@@ -32,8 +32,8 @@ parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,
 
 parser.add_argument('--log', default=True, type=bool) # 日志开关
 parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
-parser.add_argument('--update_interval', default=800, type=int) # 网络更新step间隔
-parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
+parser.add_argument('--update_interval', default=500, type=int) # 网络更新step间隔
+parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model
  
 parser.add_argument('--max_episode', default=1800, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数

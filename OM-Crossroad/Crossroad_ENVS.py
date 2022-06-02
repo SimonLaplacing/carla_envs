@@ -81,7 +81,7 @@ class Create_Envs(object):
                     Rotation(pitch=0, yaw=-90, roll=-0.000000))
         obstacle_transform1.location += carla.Location(x=50,y=-27,z=3)
         obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        for i in range(10):
+        for i in range(30):
             obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
             obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.12)
             obstacle_list.append(obstacle1)
@@ -211,7 +211,7 @@ class Create_Envs(object):
         npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
         # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
 
-        npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_dis_x/20,npc_dis_y/20,npc_ob_y/2,
+        npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_dis_x/20,npc_dis_y/20,npc_ob_y/25,
             npc_vec[0]/30,npc_vec[1]/30,np.sin(npc_yaw/2),ego_vec[0]/30,ego_vec[1]/30,np.sin(ego_yaw/2)])
         
         # ego_acceleration = abs(ego.get_acceleration().y)
@@ -232,8 +232,8 @@ class Create_Envs(object):
         if npc_target_disX > -0.5:
             npc_bonus += 1
 
-        ego_reward = (-60)*ego_col[0] + (-3)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-10)*np.abs(np.sin(ego_yaw/2)) + (0.002)*(ego_dis) + 30*ego_bonus - 0.0008*step
-        npc_reward = (-60)*npc_col[0] + (-3)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-10)*np.abs(np.sin(npc_yaw/2)) + (0.002)*(npc_dis) + 30*npc_bonus - 0.0008*step
+        ego_reward = (-60)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
+        npc_reward = (-60)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
