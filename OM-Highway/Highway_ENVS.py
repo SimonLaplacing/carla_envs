@@ -136,7 +136,7 @@ class Create_Envs(object):
             npc_steer = c_tau*npc_steer + (1-c_tau)*npc.get_control().steer
             if ego_move >= 0:
                 ego_throttle = c_tau*ego_move + (1-c_tau)*ego.get_control().throttle
-                ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
+                ego_control = carla.VehicleControl(throttle = 0*ego_throttle, steer = ego_steer, brake = 0)
             elif ego_move < 0:
                 ego_brake = -c_tau*ego_move + (1-c_tau)*ego.get_control().brake
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)

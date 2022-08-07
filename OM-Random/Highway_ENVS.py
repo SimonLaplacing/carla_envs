@@ -10,7 +10,6 @@ from global_route_planner_dao import GlobalRoutePlannerDAO
 from global_route_planner import GlobalRoutePlanner
 
 import misc
-import random
 
 class Create_Envs(object):
     def __init__(self,synchronous_mode = False,no_rendering_mode=False,fixed_delta_seconds = 0.05):
@@ -24,7 +23,7 @@ class Create_Envs(object):
         client.set_timeout(10.0)
 
         # 连接世界
-        self.world = client.load_world('Town03')
+        self.world = client.load_world('Town04')
         settings = self.world.get_settings()
         settings.synchronous_mode = self.synchronous_mode
         settings.no_rendering_mode = self.no_rendering_mode
@@ -43,8 +42,8 @@ class Create_Envs(object):
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        ego_transform = Transform(Location(x=9, y=-110.350967, z=0.1), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
+        ego_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
+                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
         ego_list.append(ego)
@@ -53,18 +52,16 @@ class Create_Envs(object):
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
         # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=9, y=-115.350967, z=0), 
-                    Rotation(pitch=0, yaw=180, roll=-0.000000))
-        spec_transform.location += carla.Location(x=-5,z=60)
-        spec_transform.rotation = carla.Rotation(pitch=-90,yaw=1.9,roll=-0.000000)
+        spec_transform = Transform(Location(x=140.341522, y=-375.140472, z=15.281942), 
+                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
+        spec_transform.location += carla.Location(x=60,z=45)
+        spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
         spectator.set_transform(spec_transform)
 
         # npc设置--------------------------------------------------------------------
-        npc_transform = Transform(Location(x=9, y=-110.350967, z=0.1), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
+        npc_transform = ego_transform
         for i in range(1):
-            npc_transform.location += carla.Location(x=-18,y=-24)
-            npc_transform.rotation = carla.Rotation(pitch=0,yaw=0, roll=-0.000000)
+            npc_transform.location += carla.Location(x=-15,y=-3.5)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             # print(npc_bp.get_attribute('color').recommended_values)
             npc_bp.set_attribute('color', '229,28,0')
@@ -76,43 +73,26 @@ class Create_Envs(object):
                 print('created %s' % npc.type_id)
 
         # 障碍物设置------------------------------------------------------------------
-        obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
-        # 障碍物1
-        obstacle_transform1 = Transform(Location(x=9, y=-110.350967,z=0), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform1.location += carla.Location(x=50,y=-27,z=3)
-        obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        for i in range(30):
-            obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
-            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.12)
-            obstacle_list.append(obstacle1)
-        # 障碍物2  
-        # obstacle_transform2 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform2.location += carla.Location(x=-2.8,y=-18.5)
-        # obstacle_transform2.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        # for i in range(7):
-        #     obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
-        #     obstacle_transform2.location += carla.Location(x=-2.5)
-        #     obstacle_list.append(obstacle2)
-        # # 障碍物3
-        # obstacle_transform3 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform3.location += carla.Location(x=-1.65,y=-17.5)
-        # obstacle_transform3.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
-        # for i in range(10):
-        #     obstacle3 = world.try_spawn_actor(obsta_bp, obstacle_transform3)
-        #     obstacle_transform3.location += carla.Location(x=0.006,y=2.5)
-        #     obstacle_list.append(obstacle3)
-        # # 障碍物4
-        # obstacle_transform4 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform4.location += carla.Location(x=2.45,y=-15)
-        # obstacle_transform4.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
-        # for i in range(10):
-        #     obstacle4 = world.try_spawn_actor(obsta_bp, obstacle_transform4)
-        #     obstacle_transform4.location += carla.Location(y=2.5)
-        #     obstacle_list.append(obstacle4)
+        obstacle_transform = ego_transform
+        for i in range(28):
+            if i == 0:
+                obsta_bp = blueprint_library.find(id='vehicle.mercedes-benz.coupe')
+                obstacle_transform.location += carla.Location(x=55,y=3.8)
+                obstacle = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_transform.location += carla.Location(x=50,y=-5.3)
+                if obstacle is None:
+                    print('%s obstacle created failed' % i)
+                else:
+                    obstacle_list.append(obstacle)
+                    print('created %s' % obstacle.type_id)
+            else:
+                obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
+                obstacle_transform.location += carla.Location(x=-3.5,y=7.4)
+                obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_list.append(obstacle1)
+                obstacle_transform.location += carla.Location(y=-7.4)
+                obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
+                obstacle_list.append(obstacle2)
 
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
@@ -120,12 +100,11 @@ class Create_Envs(object):
         ego_invasion = SS.LaneInvasionSensor(ego)
         npc_invasion = SS.LaneInvasionSensor(npc)
         sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
-
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 全局规划
     def route_positions_generate(self,start_pos,end_pos):
-        dao = GlobalRoutePlannerDAO(self.world.get_map(), sampling_resolution=3.5)
+        dao = GlobalRoutePlannerDAO(self.world.get_map(), sampling_resolution=3)
         grp = GlobalRoutePlanner(dao)
         grp.setup()
         self._grp = grp
@@ -144,9 +123,8 @@ class Create_Envs(object):
     def set_vehicle_control(self,ego,npc,ego_action,npc_action,c_tau,step):
         if step == 0:
             # 初始速度设定
-
-            ego_target_speed = carla.Vector3D(0,-10,0)
-            npc_target_speed = carla.Vector3D(12,0,0) 
+            ego_target_speed = carla.Vector3D(16.5,0,0) # 16.5
+            npc_target_speed = carla.Vector3D(20,0,0) # 20
             ego.set_target_velocity(ego_target_speed)
             npc.set_target_velocity(npc_target_speed)
             # print('target velocity is set!')
@@ -175,7 +153,7 @@ class Create_Envs(object):
                                             npc.get_control().throttle,npc_steer,npc.get_control().brake))
     
     # 车辆信息反馈
-    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_route, npc_route, ego_next_route, npc_next_route, obstacle, ego_step, npc_step, ego_num, npc_num, step):
+    def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor,ego_route,npc_route, obstacle, step):
 
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
@@ -183,45 +161,34 @@ class Create_Envs(object):
         # 速度、加速度
         ego_velocity = ego.get_velocity()
         npc_velocity = npc.get_velocity()
-        ego_yaw = ego_next_transform.rotation.yaw * np.pi/180
-        npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
-        
+        ego_yaw = ego_next_transform.rotation.yaw
+        npc_yaw = npc_next_transform.rotation.yaw
 
-        ego_f_loc,ego_vec,ego_yaw = misc.inertial_to_frenet(ego_route,ego_next_transform.location.x,ego_next_transform.location.y,ego_velocity.x,ego_velocity.y,ego_yaw)
-        npc_f_loc,npc_vec,npc_yaw = misc.inertial_to_frenet(npc_route,npc_next_transform.location.x,npc_next_transform.location.y,npc_velocity.x,npc_velocity.y,npc_yaw)
-
-        ego_next_loc,ego_next_vec,ego_next_yaw = misc.inertial_to_frenet(ego_next_route,ego_next_transform.location.x,ego_next_transform.location.y,ego_velocity.x,ego_velocity.y,ego_yaw)
-        npc_next_loc,npc_next_vec,npc_next_yaw = misc.inertial_to_frenet(npc_next_route,npc_next_transform.location.x,npc_next_transform.location.y,npc_velocity.x,npc_velocity.y,npc_yaw)
-
-        ego_target_disX = ego_f_loc[0]
-        ego_target_disY = ego_f_loc[1]
-        ego_next_disX = ego_next_loc[0]
-        ego_next_disY = ego_next_loc[1]
+        ego_target_disX = (ego_route.location.x - ego_next_transform.location.x)
+        ego_target_disY = (ego_route.location.y - ego_next_transform.location.y)
 
         ego_dis_x = (npc_next_transform.location.x-ego_next_transform.location.x)
         ego_dis_y = (npc_next_transform.location.y-ego_next_transform.location.y)
         ego_dis = np.sqrt(ego_dis_x**2+ego_dis_y**2)
-        # ego_ob_x = (obstacle_next_transform.location.x-ego_next_transform.location.x)
+        ego_ob_x = (obstacle_next_transform.location.x-ego_next_transform.location.x)
         ego_ob_y = (obstacle_next_transform.location.y-ego_next_transform.location.y)
-        # ego_ob = np.sqrt(ego_ob_x**2+ego_ob_y**2)
+        ego_ob = np.sqrt(ego_ob_x**2+ego_ob_y**2)
 
-        ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_next_disX/10,ego_next_disY/20,ego_dis_x/20,ego_dis_y/20,ego_ob_y/25,
-            ego_vec[0]/30,ego_vec[1]/30,np.sin(ego_yaw/2),np.sin(ego_next_yaw/2),npc_vec[0]/30,npc_vec[1]/30,np.sin(npc_yaw/2)])
+        ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_dis_x/20,ego_dis_y/10,ego_ob_x/20,ego_ob_y/10,
+            ego_velocity.x/30,ego_velocity.y/10,np.sin(ego_yaw/2),npc_velocity.x/30,npc_velocity.y/10,np.sin(npc_yaw/2)])
 
-        npc_target_disX = npc_f_loc[0]
-        npc_target_disY = npc_f_loc[1]
-        npc_next_disX = npc_next_loc[0]
-        npc_next_disY = npc_next_loc[1]
+        npc_target_disX = (npc_route.location.x - npc_next_transform.location.x)
+        npc_target_disY = (npc_route.location.y - npc_next_transform.location.y)
 
         npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
         npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
         npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-        # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
+        npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
         npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-        # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
+        npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
 
-        npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/20,npc_dis_x/20,npc_dis_y/20,npc_ob_y/25,
-            npc_vec[0]/30,npc_vec[1]/30,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),ego_vec[0]/30,ego_vec[1]/30,np.sin(ego_yaw/2)])
+        npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_dis_x/20,npc_dis_y/10,npc_ob_x/20,npc_ob_y/10,
+            npc_velocity.x/30,npc_velocity.y/10,np.sin(npc_yaw/2),ego_velocity.x/30,ego_velocity.y/10,np.sin(ego_yaw/2)])
         
         # ego_acceleration = abs(ego.get_acceleration().y)
         # npc_acceleration = abs(npc.get_acceleration().y)
@@ -234,47 +201,30 @@ class Create_Envs(object):
         # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
         # ev=-1 if ego_velocity <= 2 else 0
         # nv=-1 if npc_velocity <= 2 else 0
-        ego_bonus,npc_bonus = 0, 0
-        
-        if ego_target_disX > -0.5:
-            ego_bonus += 1                    
-        if npc_target_disX > -0.5:
-            npc_bonus += 1
 
-        ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-        npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
+        ego_bonus,npc_bonus = 0, 0
+        if ego_next_state[0] < 0.2:
+            ego_bonus = 1
+        if npc_next_state[0] < 0.2:
+            npc_bonus = 1
+
+        ego_reward = (-50)*ego_col[0] + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (0.0001)*(ego_dis + ego_ob) + 30*ego_bonus - 0.002*step
+        npc_reward = (-50)*npc_col[0] + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (0.0001)*(npc_dis + npc_ob) + 30*npc_bonus - 0.002*step
         # ego_reward = (-20)*ego_col[0] + eb
         # npc_reward = (-20)*npc_col[0] + nb
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
         # done结束状态判断
-        if ego_col[0]==1: # ego结束条件ego_done
+        if ego_col[0]==1 or (ego_next_transform.location.x-120)/125 > 1: # ego结束条件ego_done
             ego_done = True
-            egocol_num = 1
-            ego_finish = 0
-        elif ego_step == ego_num - 2:
-            ego_done = True
-            egocol_num = 0
-            ego_finish = 1
         else:
             ego_done = False
-            egocol_num = 0
-            ego_finish = 0
-
-        if npc_col[0]==1: # npc结束条件npc_done
+        if npc_col[0]==1 or (npc_next_transform.location.x-120)/125 > 1: # npc结束条件npc_done
             npc_done = True
-            npccol_num = 1
-            npc_finish = 0
-        elif npc_step == npc_num - 2:
-            npc_done = True
-            npccol_num = 0
-            npc_finish = 1
         else:
-            npc_done = False
-            npccol_num = 0
-            npc_finish = 0  
-        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol_num,ego_finish,npccol_num,npc_finish]
+            npc_done = False  
+        return [ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done]
 
     # 车辆动作空间
     def get_action_space(self):
@@ -283,5 +233,5 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        state_space = [0,0,0,0,0,0,0,0,0,0,0,0]
         return state_space

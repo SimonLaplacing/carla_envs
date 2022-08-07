@@ -21,6 +21,7 @@ try:
 except IndexError:
     pass
 import carla
+import psutil
 
 def draw_waypoints(world, waypoints, z=0.5):
     """
@@ -219,3 +220,11 @@ def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None):
     rot = np.array(yaw-YAW) if yaw is not None else None
     
     return loc, vec, rot
+
+def judgeprocess(processname):
+    pl = psutil.pids()
+    for pid in pl:
+        if psutil.Process(pid).name() == processname:
+            return True
+    else:
+        return False

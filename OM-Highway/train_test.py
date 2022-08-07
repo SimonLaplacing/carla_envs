@@ -13,11 +13,14 @@ import carla
 from carla import Transform, Location, Rotation
 import misc
 import random
+import os
+import time
 
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--env', type=str, default='highway')
-parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
+parser.add_argument('--mode', default='test', type=str) # mode = 'train' or 'test'
+parser.add_argument('--load_seed', default=379, type=str) # seed
 
 parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数,1代表完全更新，0代表不更新
 parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
@@ -34,19 +37,13 @@ parser.add_argument('--log_interval', default=50, type=int) # 网络保存间隔
 parser.add_argument('--update_interval', default=800, type=int) # 网络更新step间隔
 parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model
  
-parser.add_argument('--max_episode', default=2400, type=int) # 仿真次数
+parser.add_argument('--max_episode', default=200, type=int) # 仿真次数
 parser.add_argument('--update_iteration', default = 10, type=int) # 网络迭代次数
 args = parser.parse_args()
 
 # 环境建立
-if args.mode == 'train':
-    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
-    print('==========training mode is activated==========')
-elif args.mode == 'test':
-    create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,False,args.fixed_delta_seconds)
-    print('===========testing mode is activated===========')
-else:
-    raise NameError("wrong mode!!!")
+
+create_envs = IPPO_ENVS.Create_Envs(args.synchronous_mode,args.no_rendering_mode,args.fixed_delta_seconds) # 设置仿真模式以及步长
 
 # 状态、动作空间定义
 action_space = create_envs.get_action_space()
@@ -62,20 +59,26 @@ directory = './carla-Highway/'
 def main():
     ego_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
     npc_PPO = PPO(state_dim, action_dim, args.Alearning_rate, args.Clearning_rate, args.gamma, args.update_iteration, 0.2, True, action_std_init=1)
+    if not misc.judgeprocess('CarlaUE4.exe'):
+        os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
+        time.sleep(10)
     client, world, blueprint_library = create_envs.connection()
+    seed = random.randint(0,10000)
     if args.log == True:
-        main_writer = SummaryWriter(directory + '/' + args.mode + str(random.randint(0,1000)))
+        main_writer = SummaryWriter(directory + '/' + args.mode + str(seed))
     count = 0
+    pre_t = 0
     try:
         if args.load or args.mode == 'test': 
-            ego_PPO.load(directory + 'ego.pkl')
-            npc_PPO.load(directory + 'npc.pkl')
+            ego_PPO.load(directory + '/' + 'train' + str(args.load_seed) + '/' + 'ego.pkl')
+            npc_PPO.load(directory + '/' + 'train' + str(args.load_seed) + '/' + 'npc.pkl')
 
         for i in range(args.max_episode):
             ego_total_reward = 0
             npc_total_reward = 0
             ego_offsety = 0
             npc_offsety = 0
+            
             print('------------%dth time learning begins-----------'%i)
             ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
             egosen_list = sensor_list[0]
@@ -141,9 +144,11 @@ def main():
                 npc_offsety += np.abs(npc_state[1])
                 ego_PPO.buffer.rewards.append(ego_reward)
                 npc_PPO.buffer.rewards.append(npc_reward)
+                # main_writer.add_scalar('offset/ego_step_offsety', npc_offsety/ego_state[1], global_step=pre_t+t)
+                # main_writer.add_scalar('offset/npc_step_offsety', npc_offsety/npc_state[1], global_step=pre_t+t)
 
                 if args.mode == 'test':
-                    if ego_done and npc_done or t==args.max_length_of_trajectory-1:
+                    if ego_done or npc_done or t==args.max_length_of_trajectory-1:
                         break
 
                 if args.mode == 'train':
@@ -155,7 +160,7 @@ def main():
                         ego_PPO.buffer.is_terminals.append(False)
                         npc_PPO.buffer.is_terminals.append(False)
 
-
+            pre_t += t
             ego_total_reward /= t+1
             npc_total_reward /= t+1
                 
@@ -183,8 +188,8 @@ def main():
                         count = 0
                     
                     if i > 0 and (i+1) % args.log_interval == 0:
-                        ego_PPO.save(directory + 'ego.pkl')
-                        npc_PPO.save(directory + 'npc.pkl')
+                        ego_PPO.save(directory + '/' + args.mode + str(seed) + '/' + 'ego.pkl')
+                        npc_PPO.save(directory + '/' + args.mode + str(seed) + '/' + 'npc.pkl')
                         print('Network Saved')
 
             for x in sensor_list[0]:

@@ -12,6 +12,7 @@ import math
 import numpy as np
 
 import carla
+import psutil
 
 def draw_waypoints(world, waypoints, z=0.5):
     """
@@ -161,3 +162,60 @@ def positive(num):
         :param num: value to check
     """
     return num if num > 0.0 else 0.0
+
+# 大地转自车坐标系
+def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None):
+    """
+    Transform a point from the global coordinate system to the local one
+
+        :param X,Y,VX,VY,YAW: global coordinates
+    """
+    veh_trans = veh.get_transform()
+    X = veh_trans.location.x
+    Y = veh_trans.location.y
+    YAW = veh_trans.rotation.yaw * np.pi/180
+    VX = veh.get_velocity().x
+    VY = veh.get_velocity().y
+
+    # Compute the rotation matrix
+    R = np.array([[math.cos(YAW), math.sin(YAW)], [-math.sin(YAW), math.cos(YAW)]])
+
+    # Compute the transformation
+    T = np.array([x-X, y-Y])
+
+    S = np.array([vx-VX, vy-VY])
+    
+    # Compute the transformed point
+    loc = np.dot(R, T)
+    vec = np.dot(R, S)
+    rot = np.array(yaw-YAW)
+    return loc, vec, rot
+
+def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None):
+    X = route.location.x
+    Y = route.location.y
+    YAW = route.rotation.yaw * np.pi/180
+
+    # Compute the rotation matrix
+    R = np.array([[math.cos(YAW), math.sin(YAW)], [-math.sin(YAW), math.cos(YAW)]])
+
+    # Compute the transformation
+
+    T = np.array([x-X, y-Y])
+
+    S = np.array([vx, vy])
+    
+    # Compute the transformed point
+    loc = np.dot(R, T) if x is not None else None
+    vec = np.dot(R, S) if vx is not None else None
+    rot = np.array(yaw-YAW) if yaw is not None else None
+    
+    return loc, vec, rot
+
+def judgeprocess(processname):
+    pl = psutil.pids()
+    for pid in pl:
+        if psutil.Process(pid).name() == processname:
+            return True
+    else:
+        return False

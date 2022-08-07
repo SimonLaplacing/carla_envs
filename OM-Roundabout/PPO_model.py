@@ -39,10 +39,10 @@ class RolloutBuffer:
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, action_std_init=0.6):
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(state_dim + action_dim, 128)
-        self.fc2 = nn.Linear(128,64)
-        self.mu_head = nn.Linear(64, action_dim)
-        self.sigma_head = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(state_dim + action_dim, 256)
+        self.fc2 = nn.Linear(256,128)
+        self.mu_head = nn.Linear(128, action_dim)
+        self.sigma_head = nn.Linear(128, 1)
         self.action_std_init = action_std_init
 
     def forward(self, s, u_hat):
@@ -58,9 +58,9 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, state_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.state_value= nn.Linear(64, 1)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.state_value= nn.Linear(128, 1)
 
     def forward(self, x):
         # x = torch.cat([s,-1)
@@ -72,10 +72,10 @@ class Critic(nn.Module):
 class OM(nn.Module):
     def __init__(self, state_dim, action_dim, action_std_init=0.6):
         super(OM, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128,64)
-        self.mu_head = nn.Linear(64, action_dim)
-        self.sigma_head = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256,128)
+        self.mu_head = nn.Linear(128, action_dim)
+        self.sigma_head = nn.Linear(128, 1)
         self.action_std_init = action_std_init
 
     def forward(self, x):
