@@ -24,8 +24,8 @@ except IndexError:
     pass
 import carla
 
-from local_planner import RoadOption
-from misc import vector
+from utils.local_planner import RoadOption
+from utils.misc import vector
 
 
 class GlobalRoutePlanner(object):

@@ -10,8 +10,8 @@ from collections import deque
 import random
 
 import carla
-from controller import VehiclePIDController
-from misc import draw_waypoints
+from utils.controller import VehiclePIDController
+from utils.misc import draw_waypoints
 
 
 class RoadOption(Enum):

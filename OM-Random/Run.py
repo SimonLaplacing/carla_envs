@@ -5,7 +5,7 @@ from torch.utils.tensorboard import SummaryWriter
 import argparse
 from Model.ACOM.normalization import Normalization, RewardScaling
 from Model.ACOM.replaybuffer import ReplayBuffer
-from Model.ACOM.ppo_discrete_rnn import PPO_discrete_RNN
+from Model.ACOM.ppo_rnn import PPO_RNN
 
 import Envs.Crossroad_ENVS as IPPO_ENVS
 
@@ -30,17 +30,16 @@ class Runner:
         # Create env
         if not misc.judgeprocess('CarlaUE4.exe'):
             os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
-            time.sleep(10)
+            time.sleep(15)
         self.world = self.create_envs.connection()
 
         self.ego_buffer = ReplayBuffer(self.args)
         self.npc_buffer = ReplayBuffer(self.args)
-        self.ego = PPO_discrete_RNN(self.args)
-        self.npc = PPO_discrete_RNN(self.args)
+        self.ego = PPO_RNN(self.args)
+        self.npc = PPO_RNN(self.args)
 
         # Create a tensorboard
-        if args.log == True:
-            self.writer = SummaryWriter(self.directory + '/' + self.args.mode + str(self.args.seed))
+        self.writer = SummaryWriter(self.directory + '/' + self.args.mode + str(self.args.seed))
 
         self.ego_evaluate_rewards = []  # Record the rewards during the evaluating
         self.npc_evaluate_rewards = []
@@ -55,37 +54,43 @@ class Runner:
             self.reward_scaling = RewardScaling(shape=1, gamma=self.args.gamma)
 
     def run(self, ):
-        if self.args.load or self.args.mode == 'test': 
-            self.ego.load(self.directory + '/' + 'train' + str(args.load_seed) + '/ego.pkl')
-            self.npc.load(self.directory + '/' + 'train' + str(args.load_seed) + '/npc.pkl')
-        self.create_envs.Create_actors()
-        evaluate_num = -1  # Record the number of evaluations
-        
-        for i in range(self.args.max_episode):
-            self.total_episode += 1
-            if i == 0:
-                # 全局路径
-                ego_route, npc_route = self.create_envs.get_route()
-                misc.draw_waypoints(self.world,ego_route)
-                misc.draw_waypoints(self.world,npc_route)
-        # while self.total_steps < self.args.max_train_steps:
-            if self.total_steps // self.args.evaluate_freq > evaluate_num:
-                self.evaluate_policy()  # Evaluate the policy every 'evaluate_freq' steps
-                evaluate_num += 1
+        try:
+            if self.args.load or self.args.mode == 'test': 
+                self.ego.load(self.directory + '/' + 'train' + str(args.load_seed) + '/ego.pkl')
+                self.npc.load(self.directory + '/' + 'train' + str(args.load_seed) + '/npc.pkl')
             
-            _, _, episode_steps = self.run_episode()  # Run an episode
-            self.total_steps += episode_steps
+            evaluate_num = -1  # Record the number of evaluations
+            
+            for i in range(self.args.max_episode):
+                self.create_envs.Create_actors()
+                self.total_episode += 1
+                if i == 0:
+                    # 全局路径
+                    ego_route, npc_route, _, _ = self.create_envs.get_route()
+                    misc.draw_waypoints(self.world,ego_route)
+                    misc.draw_waypoints(self.world,npc_route)
+            # while self.total_steps < self.args.max_train_steps:
+                if self.total_episode // self.args.evaluate_freq > evaluate_num:
+                    self.evaluate_policy()  # Evaluate the policy every 'evaluate_freq' steps
+                    evaluate_num += 1
+                
+                _, _, episode_steps = self.run_episode()  # Run an episode
+                self.total_steps += episode_steps
 
-            if self.ego_buffer.episode_num >= self.args.batch_size:
-                self.ego.train(self.ego_buffer, self.total_steps)  # Training
-                self.npc.train(self.npc_buffer, self.total_steps)  # Training
-                self.ego_buffer.reset_buffer()
-                self.npc_buffer.reset_buffer()
+                if self.ego_buffer.episode_num >= self.args.batch_size:
+                    print('------start_training-------')
+                    self.ego.train(self.ego_buffer, self.total_steps)  # Training
+                    self.npc.train(self.npc_buffer, self.total_steps)  # Training
+                    self.ego_buffer.reset_buffer()
+                    self.npc_buffer.reset_buffer()
 
-        self.evaluate_policy()
-        self.create_envs.reset()
+            self.evaluate_policy()
+
+        finally:
+            self.create_envs.reset()
 
     def run_episode(self, ):
+        print('------start_simulating-------')
         ego_total_reward = 0
         npc_total_reward = 0
         ego_offsetx = 0
@@ -134,14 +139,12 @@ class Runner:
             npc_offsetx += np.abs(npc_state[0])
             ego_offsety += np.abs(ego_state[1])
             npc_offsety += np.abs(npc_state[1])
-            self.ego.buffer.rewards.append(ego_reward)
-            self.npc.buffer.rewards.append(npc_reward)
-
-            if args.mode == 'test':
+            
+            if self.args.mode == 'test':
                 if ego_done or npc_done or episode_step==args.max_length_of_trajectory-1: # 结束条件
                     break
 
-            if args.mode == 'train':
+            if self.args.mode == 'train':
                 if ego_done or npc_done or episode_step==args.max_length_of_trajectory-1: # 结束条件
                     ego_dw = True
                     npc_dw = True
@@ -157,7 +160,6 @@ class Runner:
         self.ego_buffer.store_transition(episode_step, ego_state, ego_v, ego_a, ego_a_logprob, ego_reward, ego_dw)
         self.npc_buffer.store_transition(episode_step, npc_state, npc_v, npc_a, npc_a_logprob, npc_reward, npc_dw)
 
-
         # An episode is over, store v in the last step
         if self.args.use_state_norm:
             ego_state = self.state_norm(ego_state)
@@ -166,10 +168,12 @@ class Runner:
         npc_v = self.npc.get_value(npc_state)
         self.ego_buffer.store_last_value(episode_step + 1, ego_v)
         self.npc_buffer.store_last_value(episode_step + 1, npc_v)
-
+        print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(self.total_episode, episode_step+1, ego_total_reward/(episode_step + 1), npc_total_reward/(episode_step + 1)))
+        self.create_envs.reset()
         return ego_total_reward/(episode_step + 1), npc_total_reward/(episode_step + 1), episode_step + 1
 
     def evaluate_policy(self, ):
+        print('------start_evaluating-------')
         ego_evaluate_reward = 0
         npc_evaluate_reward = 0
         
@@ -204,6 +208,12 @@ class Runner:
                 ego_a, _ = self.ego.choose_action(ego_state, evaluate=True)
                 npc_a, _ = self.npc.choose_action(npc_state, evaluate=True)
                 self.create_envs.set_vehicle_control(ego_a, npc_a)
+                frames = 1 # 步长 
+                if self.args.synchronous_mode:
+                    for _ in range(frames):
+                        self.world.tick() # 客户端主导，tick
+                else:
+                    self.world.wait_for_tick() # 服务器主导，tick
                 ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol,ego_fin,npccol,npc_fin = self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step)
                 ego_state = ego_next_state
                 npc_state = npc_next_state
@@ -231,8 +241,8 @@ class Runner:
 
         ego_evaluate_reward /= self.args.evaluate_times
         npc_evaluate_reward /= self.args.evaluate_times
-        self.ego_evaluate_rewards.append(ego_evaluate_reward)
-        self.npc_evaluate_rewards.append(npc_evaluate_reward)
+        # self.ego_evaluate_rewards.append(ego_evaluate_reward)
+        # self.npc_evaluate_rewards.append(npc_evaluate_reward)
         ego_total_offsetx /= self.args.evaluate_times
         npc_total_offsetx /= self.args.evaluate_times
         ego_total_offsety /= self.args.evaluate_times
@@ -243,7 +253,7 @@ class Runner:
         npc_total_fin /= self.args.evaluate_times
         npc_total_col /= self.args.evaluate_times
 
-        print("total_episodes:{} \t evaluate_reward:{}".format(self.total_episode, ego_evaluate_reward))
+        # print("total_episodes:{} \t evaluate_reward:{}".format(self.total_episode, ego_evaluate_reward))
         self.writer.add_scalar('reward/ego_evaluate_rewards', ego_evaluate_reward, global_step=self.total_episode)
         self.writer.add_scalar('reward/npc_evaluate_rewards', npc_evaluate_reward, global_step=self.total_episode)
         self.writer.add_scalar('step/step', evaluate_step, global_step=self.total_episode)
@@ -262,17 +272,19 @@ class Runner:
         self.ego.save(self.directory + '/' + args.mode + str(args.seed) + '/' + 'ego.pkl')
         self.npc.save(self.directory + '/' + args.mode + str(args.seed) + '/' + 'npc.pkl')
         print('Network Saved')
+        self.create_envs.reset()
+        self.create_envs.Create_actors()
 
 
-if __name__ == '__self._':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting for PPO-discrete")
-    # parser.add_argument("--max_train_steps", type=int, default=int(2e5), help=" Maximum number of training steps")
+    parser.add_argument("--max_train_steps", type=int, default=int(5e5), help=" Maximum number of training steps")
     parser.add_argument("--evaluate_freq", type=float, default=10, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--save_freq", type=int, default=20, help="Save frequency")
     parser.add_argument("--evaluate_times", type=float, default=3, help="Evaluate times")
 
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=2, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=10, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate of actor")
@@ -292,13 +304,13 @@ if __name__ == '__self._':
     parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU")
     
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--seed', default=7304, type=str) # seed
+    parser.add_argument('--seed', default=111, type=str) # seed
     parser.add_argument('--load_seed', default=7304, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
 
     parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-    parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+    parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
     parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
     parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model  
     parser.add_argument('--max_episode', default=1800, type=int) # 仿真次数

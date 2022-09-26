@@ -4,7 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 import argparse
 from Model.ACOM.normalization import Normalization, RewardScaling
 from Model.ACOM.replaybuffer import ReplayBuffer
-from Model.ACOM.ppo_discrete_rnn import PPO_discrete_RNN as PPO
+from Model.ACOM.ppo_rnn import PPO_discrete_RNN as PPO
 
 import Envs.Crossroad_ENVS as IPPO_ENVS
 # import carla

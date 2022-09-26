@@ -3,14 +3,13 @@ import numpy as np
 import carla
 from carla import Transform, Location, Rotation
 
-import time
-
+# import time
 import utils.Simple_Sensors as SS
 from utils.global_route_planner_dao import GlobalRoutePlannerDAO
 from utils.global_route_planner import GlobalRoutePlanner
 
 import utils.misc as misc
-import random
+# import random
 
 class Create_Envs(object):
     def __init__(self,args):
@@ -28,8 +27,8 @@ class Create_Envs(object):
 
         self.ego_route = None
         self.npc_route = None
-        self.ego_num = None
-        self.npc_num = None
+        self.ego_num = 999
+        self.npc_num = 999
         self.c_tau = args.c_tau
 
     def connection(self):
@@ -50,6 +49,10 @@ class Create_Envs(object):
         return self.world
 
     def Create_actors(self): 
+        self.sensor_list = []
+        self.ego_list = []
+        self.npc_list = []
+        self.obstacle_list = []
         # ego车辆设置---------------------------------------------------------------
         ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
@@ -96,33 +99,6 @@ class Create_Envs(object):
             obstacle1 = self.world.try_spawn_actor(obsta_bp, obstacle_transform1)
             obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.12)
             self.obstacle_list.append(obstacle1)
-        # 障碍物2  
-        # obstacle_transform2 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform2.location += carla.Location(x=-2.8,y=-18.5)
-        # obstacle_transform2.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        # for i in range(7):
-        #     obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
-        #     obstacle_transform2.location += carla.Location(x=-2.5)
-        #     obstacle_list.append(obstacle2)
-        # # 障碍物3
-        # obstacle_transform3 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform3.location += carla.Location(x=-1.65,y=-17.5)
-        # obstacle_transform3.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
-        # for i in range(10):
-        #     obstacle3 = world.try_spawn_actor(obsta_bp, obstacle_transform3)
-        #     obstacle_transform3.location += carla.Location(x=0.006,y=2.5)
-        #     obstacle_list.append(obstacle3)
-        # # 障碍物4
-        # obstacle_transform4 = Transform(Location(x=9, y=-110.350967,z=0), 
-        #             Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        # obstacle_transform4.location += carla.Location(x=2.45,y=-15)
-        # obstacle_transform4.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
-        # for i in range(10):
-        #     obstacle4 = world.try_spawn_actor(obsta_bp, obstacle_transform4)
-        #     obstacle_transform4.location += carla.Location(y=2.5)
-        #     obstacle_list.append(obstacle4)
 
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
@@ -136,7 +112,6 @@ class Create_Envs(object):
         self.ego_list[0].set_target_velocity(ego_target_speed)
         self.npc_list[0].set_target_velocity(npc_target_speed)
 
-        return 
 
     # 全局规划
     def route_positions_generate(self,start_pos,end_pos):
@@ -335,4 +310,4 @@ class Create_Envs(object):
         for x in self.obstacle_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
-        # print('all clean, simulation done!')
+        print('all clean!')
