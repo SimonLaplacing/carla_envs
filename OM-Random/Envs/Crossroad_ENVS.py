@@ -3,13 +3,11 @@ import numpy as np
 import carla
 from carla import Transform, Location, Rotation
 
-# import time
 import utils.Simple_Sensors as SS
 from utils.global_route_planner_dao import GlobalRoutePlannerDAO
 from utils.global_route_planner import GlobalRoutePlanner
-
 import utils.misc as misc
-# import random
+from memory_profiler import profile
 
 class Create_Envs(object):
     def __init__(self,args):
@@ -47,7 +45,7 @@ class Create_Envs(object):
         # 蓝图
         self.blueprint_library = self.world.get_blueprint_library()
         return self.world
-
+    # @profile(stream=open('memory_profile.log','w+'))
     def Create_actors(self): 
         self.sensor_list = []
         self.ego_list = []
@@ -103,9 +101,10 @@ class Create_Envs(object):
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
         npc_collision = SS.CollisionSensor(npc)
-        ego_invasion = SS.LaneInvasionSensor(ego)
-        npc_invasion = SS.LaneInvasionSensor(npc)
-        self.sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
+        # ego_invasion = SS.LaneInvasionSensor(ego)
+        # npc_invasion = SS.LaneInvasionSensor(npc)
+
+        self.sensor_list.extend([[ego_collision,ego_collision],[npc_collision,npc_collision]])
 
         ego_target_speed = carla.Vector3D(0,-10,0)
         npc_target_speed = carla.Vector3D(12,0,0) 
@@ -128,7 +127,7 @@ class Create_Envs(object):
             position = route[i][0].transform
             positions.append(position)
 
-        return positions
+        return np.array(positions)
 
     def get_route(self):
         ego_transform = self.ego_list[0].get_transform()
@@ -287,6 +286,26 @@ class Create_Envs(object):
     def get_state_space(self):
         state_space = [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         return state_space
+
+    def clean(self):
+        # 清洗环境
+        print('Start Cleaning Envs')
+        for x in self.sensor_list[0]:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
+        for x in self.sensor_list[1]:
+            if x.sensor.is_alive:
+                x.sensor.destroy()
+        for x in self.ego_list:
+            # if x.is_alive:
+            self.client.apply_batch([carla.command.DestroyActor(x)])
+        for x in self.npc_list:
+            # if x.is_alive:
+            self.client.apply_batch([carla.command.DestroyActor(x)])
+        for x in self.obstacle_list:
+            # if x.is_alive:
+            self.client.apply_batch([carla.command.DestroyActor(x)])
+        print('all clean!')
 
     def reset(self):
         # 清洗环境
