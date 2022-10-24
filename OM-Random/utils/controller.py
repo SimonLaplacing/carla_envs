@@ -118,7 +118,7 @@ class PIDLongitudinalController():
         """
         Execute one step of longitudinal control to reach a given target speed.
 
-            :param target_speed: target speed in Km/h
+            :param target_speed: target speed in m/s
             :param debug: boolean for debugging
             :return: throttle control
         """
@@ -133,8 +133,8 @@ class PIDLongitudinalController():
         """
         Estimate the throttle/brake of the vehicle based on the PID equations
 
-            :param target_speed:  target speed in Km/h
-            :param current_speed: current speed of the vehicle in Km/h
+            :param target_speed:  target speed in m/s
+            :param current_speed: current speed of the vehicle in m/s
             :return: throttle/brake control
         """
 
@@ -203,12 +203,12 @@ class PIDLateralController():
         # Get the vector vehicle-target_wp
         if self._offset != 0:
             # Displace the wp to the side
-            w_tran = waypoint.transform
+            w_tran = waypoint
             r_vec = w_tran.get_right_vector()
             w_loc = w_tran.location + carla.Location(x=self._offset*r_vec.x,
                                                          y=self._offset*r_vec.y)
         else:
-            w_loc = waypoint.transform.location
+            w_loc = waypoint.location
 
         w_vec = np.array([w_loc.x - ego_loc.x,
                           w_loc.y - ego_loc.y,

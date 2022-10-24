@@ -5,6 +5,7 @@ import copy
 
 class ReplayBuffer:
     def __init__(self, args):
+        self.args = args
         self.gamma = args.gamma
         self.lamda = args.lamda
         self.use_adv_norm = args.use_adv_norm
@@ -18,7 +19,8 @@ class ReplayBuffer:
         self.reset_buffer()
 
     def reset_buffer(self):
-        self.buffer = {'s': np.zeros([self.batch_size, self.episode_limit, self.state_dim]),
+        self.buffer = {'s': np.zeros([self.batch_size, self.episode_limit + 1, self.state_dim]),
+                       'p': np.zeros([self.batch_size, self.episode_limit + 1, self.args.hidden_dim1]),
                        'v': np.zeros([self.batch_size, self.episode_limit + 1]),
                        'a': np.zeros([self.batch_size, self.episode_limit,self.action_dim]),
                        'a_logprob': np.zeros([self.batch_size, self.episode_limit]),
@@ -29,8 +31,9 @@ class ReplayBuffer:
         self.episode_num = 0
         self.max_episode_len = 0
 
-    def store_transition(self, episode_step, s, v, a, a_logprob, r, dw):
+    def store_transition(self, episode_step, s, p, v, a, a_logprob, r, dw):
         self.buffer['s'][self.episode_num][episode_step] = s
+        self.buffer['p'][self.episode_num][episode_step] = p
         self.buffer['v'][self.episode_num][episode_step] = v
         self.buffer['a'][self.episode_num][episode_step] = a
         self.buffer['a_logprob'][self.episode_num][episode_step] = a_logprob
@@ -39,8 +42,10 @@ class ReplayBuffer:
 
         self.buffer['active'][self.episode_num][episode_step] = 1.0
 
-    def store_last_value(self, episode_step, v):
+    def store_last_sv(self, episode_step, v, s, p):
         self.buffer['v'][self.episode_num][episode_step] = v
+        self.buffer['s'][self.episode_num][episode_step] = s
+        self.buffer['p'][self.episode_num][episode_step] = p
         self.episode_num += 1
         # Record max_episode_len
         if episode_step > self.max_episode_len:
@@ -67,12 +72,22 @@ class ReplayBuffer:
                 adv_copy[active == 0] = np.nan  # 忽略掉active=0的那些adv
                 adv = ((adv - np.nanmean(adv_copy)) / (np.nanstd(adv_copy) + 1e-5))
         return adv, v_target
+    
+    def get_om_real_a(self):
+        s = self.buffer['s'][:,:self.max_episode_len]
+        s_next = self.buffer['s'][:,1:self.max_episode_len + 1]
+        delta = s_next - s
+        om_real_a = delta[:,:,10:13]
+        return om_real_a
 
     def get_training_data(self):
         adv, v_target = self.get_adv()
+        om_real_a = self.get_om_real_a()
         batch = {'s': torch.tensor(self.buffer['s'][:, :self.max_episode_len], dtype=torch.float32),
-                 'a': torch.tensor(self.buffer['a'][:, :self.max_episode_len], dtype=torch.long),  # 动作a的类型必须是long
+                 'p': torch.tensor(self.buffer['p'][:, :self.max_episode_len], dtype=torch.float32),
+                 'a': torch.tensor(self.buffer['a'][:, :self.max_episode_len], dtype=torch.float32),  
                  'a_logprob': torch.tensor(self.buffer['a_logprob'][:, :self.max_episode_len], dtype=torch.float32),
+                 'om_real_a': torch.tensor(om_real_a, dtype=torch.float32),
                  'active': torch.tensor(self.buffer['active'][:, :self.max_episode_len], dtype=torch.float32),
                  'adv': torch.tensor(adv, dtype=torch.float32),
                  'v_target': torch.tensor(v_target, dtype=torch.float32)}

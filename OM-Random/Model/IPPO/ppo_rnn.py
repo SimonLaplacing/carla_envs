@@ -1,9 +1,12 @@
+from ast import Delete
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, SequentialSampler
 from torch.distributions import Normal, MultivariateNormal
+import copy
+from memory_profiler import profile
 
 ################################## set device ##################################
 print("============================================================================================")
@@ -44,13 +47,14 @@ class Actor_Critic_RNN(nn.Module):
             self.actor_rnn = nn.LSTM(args.hidden_dim1, args.hidden_dim1, batch_first=True)
         self.actor_fc2 = nn.Linear(args.hidden_dim1, args.hidden_dim2)
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
-        self.log_std = nn.Parameter(torch.eye(args.action_dim, args.action_dim))  # We use 'nn.Parameter' to train log_std automatically
+        # self.log_std = nn.Parameter(self.args.init_logstd * torch.eye(args.action_dim, args.action_dim))  # We use 'nn.Parameter' to train log_std automatically
+        self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim)
 
         self.critic_rnn_hidden = None
         self.critic_fc1 = nn.Linear(args.state_dim, args.hidden_dim1)
         if args.use_gru:
             self.critic_rnn = nn.GRU(args.hidden_dim1, args.hidden_dim1, batch_first=True)
-        else:
+        elif args.use_lstm:
             self.critic_rnn = nn.LSTM(args.hidden_dim1, args.hidden_dim1, batch_first=True)
         self.critic_fc2 = nn.Linear(args.hidden_dim1, args.hidden_dim2)
         self.critic_fc3 = nn.Linear(args.hidden_dim2, 1)
@@ -59,7 +63,8 @@ class Actor_Critic_RNN(nn.Module):
             # print("------use orthogonal init------")
             orthogonal_init(self.actor_fc1)
             orthogonal_init(self.actor_fc2)
-            orthogonal_init(self.mean_layer, gain=0.01)
+            orthogonal_init(self.mean_layer)
+            orthogonal_init(self.std_layer)
             orthogonal_init(self.critic_fc1)
             orthogonal_init(self.critic_fc2)
             orthogonal_init(self.critic_fc3)
@@ -74,8 +79,8 @@ class Actor_Critic_RNN(nn.Module):
         output = self.activate_func(s)
         output = self.activate_func(self.actor_fc2(output))
         mean = torch.tanh(self.mean_layer(output))
-        # log_std = self.log_std.expand_as(mean)  # To make 'log_std' have the same dimension as 'mean'
-        std = torch.exp(self.log_std)  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
+        std = torch.exp(torch.tanh(self.std_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
+        std = self.args.init_std * torch.diag_embed(std)
         dist = MultivariateNormal(mean, std)  # Get the Gaussian distribution
         return mean, std, dist
 
@@ -94,7 +99,7 @@ class PPO_RNN:
         self.args = args
         self.batch_size = args.batch_size
         self.mini_batch_size = args.mini_batch_size
-        self.max_train_steps = args.max_train_steps
+        self.max_train_steps = args.max_length_of_trajectory * args.max_episode
         self.lr = args.lr  # Learning rate of actor
         self.gamma = args.gamma  # Discount factor
         self.lamda = args.lamda  # GAE parameter
@@ -116,7 +121,7 @@ class PPO_RNN:
         if self.args.use_gru or self.args.use_lstm: 
             self.ac.actor_rnn_hidden = None
             self.ac.critic_rnn_hidden = None
-
+    # @profile(stream=open('memory_profile.log','w+'))
     def choose_action(self, s, evaluate=False):
         with torch.no_grad():
             s = torch.as_tensor(s, dtype=torch.float).unsqueeze(0)
@@ -172,11 +177,11 @@ class PPO_RNN:
                 # Update
                 self.optimizer.zero_grad()
                 loss = actor_loss + critic_loss * 0.5
+                # print('loss:  ', actor_loss,critic_loss,ratios)
                 loss.backward()
                 if self.use_grad_clip:  # Trick 7: Gradient clip
-                    torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 0.5)
+                    torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 0.8)
                 self.optimizer.step()
-
         if self.use_lr_decay:  # Trick 6:learning rate Decay
             self.lr_decay(total_steps)
 

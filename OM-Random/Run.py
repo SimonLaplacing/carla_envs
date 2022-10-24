@@ -21,35 +21,43 @@ class Runner:
         if self.args.model == 'OMAC':
             from Model.ACOM.normalization import Normalization, RewardScaling
             from Model.ACOM.replaybuffer import ReplayBuffer
-            from Model.ACOM.ppo_rnn import PPO_RNN as Model
+            from Model.ACOM.ACOM import PPO_RNN as Model
+        if self.args.model == 'IPPO':
+            from Model.IPPO.normalization import Normalization, RewardScaling
+            from Model.IPPO.replaybuffer import ReplayBuffer
+            from Model.IPPO.ppo_rnn import PPO_RNN as Model
 
-        self.create_envs = ENVS.Create_Envs(self.args) # 设置仿真模式以及步长
+        self.directory = './carla-Random/'
+        self.save_directory = self.directory + '/' + self.args.mode + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.save_seed)
+        # Create env
+        if not misc.judgeprocess('CarlaUE4.exe'):
+            os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
+            time.sleep(15)
+        self.create_envs = ENVS.Create_Envs(self.args,self.save_directory) # 设置仿真模式以及步长
+        self.world = self.create_envs.connection()
+
+        
+
+        # Create a tensorboard
+        self.writer = SummaryWriter(self.save_directory)
+
         # 状态、动作空间定义
         action_space = self.create_envs.get_action_space()
         state_space = self.create_envs.get_state_space()
         self.args.state_dim = len(state_space)
         self.args.action_dim = len(action_space)
         self.args.episode_limit = self.args.max_length_of_trajectory # Maximum number of steps per episode
-        self.directory = './carla-Random/'
-
-        # Create env
-        if not misc.judgeprocess('CarlaUE4.exe'):
-            os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
-            time.sleep(15)
-        self.world = self.create_envs.connection()
-
-        self.ego_buffer = ReplayBuffer(self.args)
-        self.npc_buffer = ReplayBuffer(self.args)
-        self.ego = Model(self.args)
-        self.npc = Model(self.args)
-
-        # Create a tensorboard
-        self.writer = SummaryWriter(self.directory + '/' + self.args.mode + '_' + self.args.envs + '_' + self.args.model + '_' + str(self.args.save_seed))
-
         self.ego_evaluate_rewards = []  # Record the rewards during the evaluating
         self.npc_evaluate_rewards = []
         self.total_steps = 0
         self.total_episode = 0
+        self.ego_buffer = ReplayBuffer(self.args)
+        self.npc_buffer = ReplayBuffer(self.args)
+        self.ego = Model(self.args)
+        if self.args.shared_policy:
+            pass
+        else:
+            self.npc = Model(self.args)
 
         if self.args.use_state_norm:
             print("------use state normalization------")
@@ -57,23 +65,34 @@ class Runner:
         if self.args.use_reward_scaling:
             print("------use reward scaling------")
             self.reward_scaling = RewardScaling(shape=1, gamma=self.args.gamma)
+        
+        self.ego_num,self.npc_num = 999, 999
     # @profile(stream=open('memory_profile.log','w+'))
     def run(self, ):
         
         if self.args.load or self.args.mode == 'test': 
-            self.ego.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + str(self.args.load_seed) + '/ego.pkl')
-            self.npc.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + str(self.args.load_seed) + '/npc.pkl')
+            self.ego.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/ego.pkl')
+            self.npc.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/npc.pkl')
         
         evaluate_num = -1  # Record the number of evaluations
         save_num = 1
     
         for i in range(self.args.max_episode):
             self.create_envs.Create_actors()
+            frames = 1 # 步长 
+            if self.args.synchronous_mode:
+                for _ in range(frames):
+                    self.world.tick() # 客户端主导，tick
+                    # print('frame:', ff)
+            else:
+                self.world.wait_for_tick() # 服务器主导，tick
             # print('settings:',self.world.get_settings())
             self.total_episode += 1
             if i == 0:
                 # 全局路径
-                ego_route, npc_route, _, _ = self.create_envs.get_route()
+                ego_route, npc_route, ego_num, npc_num = self.create_envs.get_route()
+                self.ego_num,self.npc_num = ego_num, npc_num
+                # print('route_num:',ego_num,npc_num)
                 misc.draw_waypoints(self.world,ego_route)
                 misc.draw_waypoints(self.world,npc_route)
 
@@ -94,12 +113,12 @@ class Runner:
 
             # Save the models
             if self.total_episode // self.args.save_freq > save_num:
-                self.ego.save(self.directory + '/' + self.args.mode + '_' + self.args.envs + '_' + self.args.model + '_' + str(self.args.save_seed) + '/' + 'ego.pkl')
-                self.npc.save(self.directory + '/' + self.args.mode + '_' + self.args.envs + '_' + self.args.model + '_' + str(self.args.save_seed) + '/' + 'npc.pkl')
+                self.ego.save(self.save_directory + '/ego.pkl')
+                self.npc.save(self.save_directory + '/npc.pkl')
                 save_num += 1
                 print('Network Saved')
             
-
+        self.create_envs.Create_actors()
         self.evaluate_policy()
         
         self.create_envs.reset()
@@ -108,27 +127,30 @@ class Runner:
         print('------start_simulating-------')
         ego_total_reward = 0
         npc_total_reward = 0
-        ego_offsetx = 0
-        npc_offsetx = 0
-        ego_offsety = 0
-        npc_offsety = 0
+        # ego_offsetx = 0
+        # npc_offsetx = 0
+        # ego_offsety = 0
+        # npc_offsety = 0
+        ego_dw, npc_dw = False, False
 
         ego_step, npc_step = 1, 1
-        ego_state,_,_,npc_state,_,_,_,_,_,_ = self.create_envs.get_vehicle_step(ego_step, npc_step, 0)
+        ego_state,_,npc_state,_,_,_,_,_,ego_BEV,npc_BEV = self.create_envs.get_vehicle_step(ego_step, npc_step, 0)
+        ego_last_state, npc_last_state = ego_state, npc_state
+        ego_last_BEV, npc_last_BEV = ego_BEV, npc_BEV
 
         if self.args.use_reward_scaling:
             self.reward_scaling.reset()
         self.ego.reset_rnn_hidden()
         self.npc.reset_rnn_hidden()
-        for episode_step in range(self.args.episode_limit):
+        for episode_step in range(999999):
             if self.args.use_state_norm:
                 ego_state = self.state_norm(ego_state)
                 npc_state = self.state_norm(npc_state)
-            ego_a, ego_a_logprob = self.ego.choose_action(ego_state, evaluate=False)
-            npc_a, npc_a_logprob = self.npc.choose_action(npc_state, evaluate=False)
-            ego_v = self.ego.get_value(ego_state)
-            npc_v = self.npc.get_value(npc_state)
-            self.create_envs.set_vehicle_control(ego_a, npc_a)
+            ego_a, ego_a_logprob, p = self.ego.choose_action(ego_state, ego_BEV, evaluate=False)
+            npc_a, npc_a_logprob, p = self.npc.choose_action(npc_state, npc_BEV, evaluate=False)
+            ego_v = self.ego.get_value(ego_state, ego_BEV)
+            npc_v = self.npc.get_value(npc_state, npc_BEV)
+            self.create_envs.set_vehicle_control(ego_a, npc_a, ego_step, npc_step)
 
             #---------和环境交互动作反馈---------
             frames = 1 # 步长 
@@ -139,52 +161,62 @@ class Runner:
             else:
                 self.world.wait_for_tick() # 服务器主导，tick
             # self.data_queue.put(self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step))
-            ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol,ego_fin,npccol,npc_fin = self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step)
+            ego_next_state,ego_reward,npc_next_state,npc_reward,egocol,ego_fin,npccol,npc_fin,ego_next_BEV,npc_next_BEV = self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step)
 
             if ego_next_state[0] > -0.1:
-                    ego_step += 1                    
+                ego_step += 1                    
             if npc_next_state[0] > -0.1:
-                    npc_step += 1
+                npc_step += 1
             
-            ego_state = ego_next_state.copy()
-            npc_state = npc_next_state.copy()
-
             ego_total_reward += ego_reward
-            npc_total_reward += npc_reward
-            ego_offsetx += np.abs(ego_state[0])
-            npc_offsetx += np.abs(npc_state[0])
-            ego_offsety += np.abs(ego_state[1])
-            npc_offsety += np.abs(npc_state[1])
-            
-            if self.args.mode == 'test':
-                if ego_done or npc_done or episode_step==args.max_length_of_trajectory-1: # 结束条件
-                    break
+            npc_total_reward += npc_reward         
 
-            if self.args.mode == 'train':
-                if ego_done or npc_done or episode_step==args.max_length_of_trajectory-1: # 结束条件
-                    ego_dw = True
-                    npc_dw = True
-                    break
-                else:
-                    ego_dw = False
-                    npc_dw = False
+            if ego_fin:
+                ego_dw += True
+            if npc_fin:
+                npc_dw += True
+            if egocol or npccol or episode_step==self.args.max_length_of_trajectory-1 or ego_step >= self.ego_num-1 or npc_step >= self.npc_num-1:
+                if not ego_dw:
+                    ego_dw += True
+                if not npc_dw:
+                    npc_dw += True
 
-        if self.args.use_reward_scaling:
-            ego_reward = self.reward_scaling(ego_reward)
-            npc_reward = self.reward_scaling(npc_reward)
-        # Store the transition
-        self.ego_buffer.store_transition(episode_step, ego_state, ego_v, ego_a, ego_a_logprob, ego_reward, ego_dw)
-        self.npc_buffer.store_transition(episode_step, npc_state, npc_v, npc_a, npc_a_logprob, npc_reward, npc_dw)
+            if self.args.use_reward_scaling:
+                ego_reward = self.reward_scaling(ego_reward)
+                npc_reward = self.reward_scaling(npc_reward)
+
+            # Store the transition, only store once after finish
+            if ego_dw < 2:
+                self.ego_buffer.store_transition(episode_step, ego_state, p, ego_v, ego_a, ego_a_logprob, ego_reward, ego_dw)
+                ego_last_state = ego_next_state
+                ego_last_BEV = ego_next_BEV
+                ego_last_step = episode_step
+                ego_episode_reward = ego_total_reward
+
+            if npc_dw < 2:
+                self.npc_buffer.store_transition(episode_step, npc_state, p, npc_v, npc_a, npc_a_logprob, npc_reward, npc_dw)
+                npc_last_state = npc_next_state
+                npc_last_BEV = npc_next_BEV
+                npc_last_step = episode_step
+                npc_episode_reward = npc_total_reward
+
+            ego_state = ego_next_state
+            npc_state = npc_next_state
+            ego_BEV = ego_next_BEV
+            npc_BEV = npc_next_BEV
+
+            if ego_dw and npc_dw: # 结束条件
+                break
 
         # An episode is over, store v in the last step
         if self.args.use_state_norm:
-            ego_state = self.state_norm(ego_state)
-            npc_state = self.state_norm(npc_state)
-        ego_v = self.ego.get_value(ego_state)
-        npc_v = self.npc.get_value(npc_state)
-        self.ego_buffer.store_last_value(episode_step + 1, ego_v)
-        self.npc_buffer.store_last_value(episode_step + 1, npc_v)
-        print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(self.total_episode, episode_step+1, ego_total_reward/(episode_step + 1), npc_total_reward/(episode_step + 1)))
+            ego_last_state = self.state_norm(ego_last_state)
+            npc_last_state = self.state_norm(npc_last_state)
+        ego_v = self.ego.get_value(ego_last_state,ego_last_BEV)
+        npc_v = self.npc.get_value(npc_last_state,npc_last_BEV)
+        self.ego_buffer.store_last_sv(ego_last_step + 1, ego_v, ego_last_state, p)
+        self.npc_buffer.store_last_sv(npc_last_step + 1, npc_v, npc_last_state, p)
+        print("Episode: {} step: {} ego_Total_Reward: {:0.3f} npc_Total_Reward: {:0.3f}".format(self.total_episode, episode_step+1, ego_episode_reward/(ego_last_step + 1), npc_episode_reward/(npc_last_step + 1)))
 
         self.create_envs.clean()
         return ego_total_reward/(episode_step + 1), npc_total_reward/(episode_step + 1), episode_step + 1
@@ -203,9 +235,9 @@ class Runner:
         ego_total_col = 0
         npc_total_fin = 0
         npc_total_col = 0
+        ego_dw, npc_dw = False, False
 
         for _ in range(self.args.evaluate_times):
-            ego_done, npc_done = False, False
             ego_episode_reward = 0
             npc_episode_reward = 0
             ego_offsetx = 0
@@ -213,7 +245,14 @@ class Runner:
             ego_offsety = 0
             npc_offsety = 0
             ego_step, npc_step = 1, 1
-            ego_state,_,_,npc_state,_,_,_,_,_,_ = self.create_envs.get_vehicle_step(ego_step, npc_step, 0)
+            frames = 1 # 步长 
+            if self.args.synchronous_mode:
+                for _ in range(frames):
+                    self.world.tick() # 客户端主导，tick
+                    # print('frame:', ff)
+            else:
+                self.world.wait_for_tick() # 服务器主导，tick
+            ego_state,_,npc_state,_,_,_,_,_,ego_BEV,npc_BEV = self.create_envs.get_vehicle_step(ego_step, npc_step, 0)
             
             self.ego.reset_rnn_hidden()
             self.npc.reset_rnn_hidden()
@@ -222,41 +261,60 @@ class Runner:
                 if self.args.use_state_norm:
                     ego_state = self.state_norm(ego_state, update=False)
                     npc_state = self.state_norm(npc_state, update=False)
-                ego_a, _ = self.ego.choose_action(ego_state, evaluate=True)
-                npc_a, _ = self.npc.choose_action(npc_state, evaluate=True)
-                self.create_envs.set_vehicle_control(ego_a, npc_a)
+                ego_a, _, _ = self.ego.choose_action(ego_state,ego_BEV, evaluate=True)
+                npc_a, _, _ = self.npc.choose_action(npc_state,npc_BEV, evaluate=True)
+                self.create_envs.set_vehicle_control(ego_a, npc_a, ego_step, npc_step)
                 frames = 1 # 步长 
                 if self.args.synchronous_mode:
                     for _ in range(frames):
-                        self.world.tick(seconds=20) # 客户端主导，tick
+                        self.world.tick() # 客户端主导，tick
                 else:
                     self.world.wait_for_tick() # 服务器主导，tick
                 # self.data_queue.put(self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step))
-                ego_next_state,ego_reward,ego_done,npc_next_state,npc_reward,npc_done,egocol,ego_fin,npccol,npc_fin = self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step)
+                ego_next_state,ego_reward,npc_next_state,npc_reward,egocol,ego_fin,npccol,npc_fin,ego_next_BEV,npc_next_BEV = self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step)
 
                 if ego_next_state[0] > -0.1:
-                    ego_step += 1                    
+                    ego_step += 1
                 if npc_next_state[0] > -0.1:
                     npc_step += 1
+                if ego_fin:
+                    ego_dw += True
+                if npc_fin:
+                    npc_dw += True
+                if egocol or npccol or episode_step==self.args.max_length_of_trajectory-1 or ego_step >= self.ego_num-1 or npc_step >= self.npc_num-1:
+                    if not ego_dw:
+                        ego_dw += True
+                    if not npc_dw:
+                        npc_dw += True
 
-                ego_state = ego_next_state.copy()
-                npc_state = npc_next_state.copy()
-                ego_episode_reward += ego_reward
-                npc_episode_reward += npc_reward
-                ego_offsetx += np.abs(ego_state[0])
-                npc_offsetx += np.abs(npc_state[0])
-                ego_offsety += np.abs(ego_state[1])
-                npc_offsety += np.abs(npc_state[1])
-                
-                if ego_done or npc_done or episode_step==args.max_length_of_trajectory-1: # 结束条件
+                if ego_dw < 2:
+                    ego_last_step = episode_step
+                    ego_offsetx += np.abs(ego_next_state[0])
+                    ego_offsety += np.abs(ego_next_state[1])
+                    ego_episode_reward += ego_reward
+                    ego_final_step = ego_step
+                    
+                if npc_dw < 2:
+                    npc_last_step = episode_step
+                    npc_offsetx += np.abs(npc_next_state[0])
+                    npc_offsety += np.abs(npc_next_state[1])
+                    npc_episode_reward += npc_reward
+                    npc_final_step = npc_step
+
+                ego_state = ego_next_state
+                npc_state = npc_next_state
+                ego_BEV = ego_next_BEV
+                npc_BEV = npc_next_BEV
+
+                if ego_dw and npc_dw: # 结束条件
                     break
-            
-            ego_evaluate_reward += ego_episode_reward/(episode_step + 1)
-            npc_evaluate_reward += npc_episode_reward/(episode_step + 1)
-            ego_total_offsetx += ego_offsetx/(episode_step + 1)
-            npc_total_offsetx += npc_offsetx/(episode_step + 1)
-            ego_total_offsety += ego_offsety/(episode_step + 1)
-            npc_total_offsety += npc_offsety/(episode_step + 1)
+
+            ego_evaluate_reward += (ego_episode_reward/(ego_last_step + 1))
+            npc_evaluate_reward += (npc_episode_reward/(npc_last_step + 1))
+            ego_total_offsetx += (ego_offsetx/(ego_last_step + 1))
+            npc_total_offsetx += (npc_offsetx/(npc_last_step + 1))
+            ego_total_offsety += (ego_offsety/(ego_last_step + 1))
+            npc_total_offsety += (npc_offsety/(npc_last_step + 1))
             evaluate_step += (episode_step+1)
             ego_total_fin += ego_fin
             ego_total_col += egocol
@@ -276,12 +334,11 @@ class Runner:
         npc_total_fin /= self.args.evaluate_times
         npc_total_col /= self.args.evaluate_times
 
-        # print("total_episodes:{} \t evaluate_reward:{}".format(self.total_episode, ego_evaluate_reward))
         self.writer.add_scalar('reward/ego_evaluate_rewards', ego_evaluate_reward, global_step=self.total_episode)
         self.writer.add_scalar('reward/npc_evaluate_rewards', npc_evaluate_reward, global_step=self.total_episode)
         self.writer.add_scalar('step/step', evaluate_step, global_step=self.total_episode)
-        self.writer.add_scalar('step/ego_step', ego_step, global_step=self.total_episode)
-        self.writer.add_scalar('step/npc_step', npc_step, global_step=self.total_episode)
+        self.writer.add_scalar('step/ego_step', ego_final_step/(self.ego_num-3), global_step=self.total_episode)
+        self.writer.add_scalar('step/npc_step', npc_final_step/(self.npc_num-3), global_step=self.total_episode)
         self.writer.add_scalar('offset/ego_offsetx', ego_total_offsetx, global_step=self.total_episode)
         self.writer.add_scalar('offset/ego_offsety', ego_total_offsety, global_step=self.total_episode)
         self.writer.add_scalar('offset/npc_offsetx', npc_total_offsetx, global_step=self.total_episode)
@@ -293,20 +350,26 @@ class Runner:
         
         self.create_envs.clean()
         self.create_envs.Create_actors()
+        frames = 1 # 步长 
+        if self.args.synchronous_mode:
+            for _ in range(frames):
+                self.world.tick() # 客户端主导，tick
+                # print('frame:', ff)
+        else:
+            self.world.wait_for_tick() # 服务器主导，tick
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting")
-    parser.add_argument("--max_train_steps", type=int, default=int(5e5), help=" Maximum number of training steps")
-    parser.add_argument("--evaluate_freq", type=float, default=3, help="Evaluate the policy every 'evaluate_freq' steps")
+    parser.add_argument("--evaluate_freq", type=float, default=32, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--save_freq", type=int, default=20, help="Save frequency")
     parser.add_argument("--evaluate_times", type=float, default=1, help="Evaluate times")
 
-    parser.add_argument("--batch_size", type=int, default=10, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=64, help="Minibatch size")
-    parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=8, help="Minibatch size")
+    parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_logstd", type=float, default=0.4, help="logstd_initialization")
+    parser.add_argument("--init_std", type=float, default=2, help="std_initialization")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.95, help="GAE parameter")
@@ -323,25 +386,25 @@ if __name__ == '__main__':
     parser.add_argument("--use_tanh", type=float, default=False, help="Trick 10: tanh activation function")
     parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU") # Priority for GRU
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
+    parser.add_argument("--shared_policy", type=bool, default=False, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=8, type=str) # seed
-    parser.add_argument('--load_seed', default=7, type=str) # seed
+    parser.add_argument('--save_seed', default=2, type=str) # seed
+    parser.add_argument('--load_seed', default=1, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=400, type=int) # 最大仿真步数
+    parser.add_argument('--max_length_of_trajectory', default=200, type=int) # 最大仿真步数
 
-    parser.add_argument('--envs', default='crossroad', type=str) # 环境选择crossroad,highway
+    parser.add_argument('--H', default=224, type=int) # BEV_Height
+    parser.add_argument('--W', default=224, type=int) # BEV_Width
+
+    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway
     parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、DRON、IPPO、MAPPO、MADDPG、PR2AC、Rules
 
     parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
     parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
-    parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
-    parser.add_argument('--load', default=True, type=bool) # 训练模式下是否load model  
-    parser.add_argument('--max_episode', default=3000, type=int) # 仿真次数
+    parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+    parser.add_argument('--load', default=False, type=bool) # 训练模式下是否load model  
+    parser.add_argument('--max_episode', default=20000, type=int) # 仿真次数
     args = parser.parse_args()
-    for _ in range(1):
-        try:
-            runner = Runner(args)
-            runner.run()
-        except RuntimeError:
-            args.save_seed += 1
-            args.load_seed += 1
+
+    runner = Runner(args)
+    runner.run()

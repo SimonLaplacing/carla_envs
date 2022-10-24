@@ -21,6 +21,7 @@ except IndexError:
 
 import carla
 from carla import ColorConverter as cc
+from carla import Transform, Location, Rotation
 
 
 
@@ -42,18 +43,14 @@ class CollisionSensor(object):
         self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
         # We need to pass the lambda a weak reference to
         # self to avoid circular reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
+        self.sensor.listen(lambda event: CollisionSensor._on_collision(self,event))
 
     def get_collision_history(self):
         return self.history
 
     @staticmethod
-    def _on_collision(weak_self, event):
+    def _on_collision(self, event):
         """On collision method"""
-        self = weak_self()
-        if not self:
-            return
         self.history[0] = 1
 
 # ==============================================================================
@@ -74,8 +71,7 @@ class LaneInvasionSensor(object):
         self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
+        self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(self,event))
 
     def get_invasion_history(self):
         return self.history
@@ -84,9 +80,48 @@ class LaneInvasionSensor(object):
         self.history = [0]
         
     @staticmethod
-    def _on_invasion(weak_self, event):
+    def _on_invasion(self, event):
         """On invasion method"""
-        self = weak_self()
-        if not self:
-            return
         self.history[0] = 1
+
+class Camera(object):
+    """ Class for camera sensors"""
+
+    def __init__(self, parent_actor, name, directory, H, W):
+        """Constructor method"""
+        # self.sensor = None
+        self._parent = parent_actor
+        self.recording = False
+        self.directory = directory
+        self.name = name
+        self.BEV = np.zeros((3, H, W), dtype=np.uint8)
+        world = self._parent.get_world()
+        blueprint = world.get_blueprint_library().find('sensor.camera.semantic_segmentation') #semantic_segmentation
+        blueprint.set_attribute('image_size_x', str(W))
+        blueprint.set_attribute('image_size_y', str(H))
+        blueprint.set_attribute('fov', '90')
+        # Set the time in seconds between sensor captures
+        blueprint.set_attribute('sensor_tick', '0')
+        transform = Transform(Location(z=15), Rotation(pitch=-90))
+        self.sensor = world.spawn_actor(blueprint, transform, attach_to=self._parent)
+        # We need to pass the lambda a weak reference to
+        # self to avoid circular reference.
+        self.sensor.listen(lambda image: Camera._parse_image(self,image))
+
+    def get_BEV(self):
+        return self.BEV
+
+    @staticmethod
+    def _parse_image(self, image):
+        """On camera method"""
+        image.convert(cc.CityScapesPalette)
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8")) # BGRA_Binary TO BGRA_Seq
+        array = np.reshape(array, (image.height, image.width, 4)) # BGRA_Seq TO BGRA_Array
+        array = array[:, :, :3] # BGRA_Array TO BGR_Array
+        array = array[:, :, ::-1] # BGR_Array TO RGB_Array
+        array = array.swapaxes(0, 2) # [H, W, 3] TO [3, W, H]
+        array = array.swapaxes(1, 2) # [3, W, H] TO [3, H, W]
+        self.BEV = array
+        # print('aaa: ',array.shape)
+        if self.recording:
+            image.save_to_disk(self.directory + '/' + self.name + '_image_%06d' % image.frame, cc.CityScapesPalette)

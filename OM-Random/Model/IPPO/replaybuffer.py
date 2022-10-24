@@ -39,8 +39,9 @@ class ReplayBuffer:
 
         self.buffer['active'][self.episode_num][episode_step] = 1.0
 
-    def store_last_value(self, episode_step, v):
+    def store_last_value(self, episode_step, v, s):
         self.buffer['v'][self.episode_num][episode_step] = v
+        self.buffer['s'][self.episode_num][episode_step] = s
         self.episode_num += 1
         # Record max_episode_len
         if episode_step > self.max_episode_len:

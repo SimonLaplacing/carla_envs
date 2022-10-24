@@ -29,19 +29,18 @@ def draw_waypoints(world, waypoints, z=0.5):
         begin = wpt.location + carla.Location(z=z)
         angle = math.radians(wpt.rotation.yaw)
         end = begin + carla.Location(x=math.cos(angle), y=math.sin(angle))
-        world.debug.draw_arrow(begin, end, arrow_size=0.3, life_time=10.0)
-
+        world.debug.draw_arrow(begin, end, arrow_size=0.3, color = carla.Color(0,255,0), life_time=0)
 
 def get_speed(vehicle):
     """
-    Compute speed of a vehicle in Km/h.
+    Compute speed of a vehicle in m/s.
 
         :param vehicle: the vehicle for which speed is calculated
-        :return: speed as a float in Km/h
+        :return: speed as a float in m/s
     """
     vel = vehicle.get_velocity()
 
-    return 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+    return math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
 
 def is_within_distance_ahead(target_transform, current_transform, max_distance):
     """
@@ -193,7 +192,7 @@ def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None):
     rot = np.array(yaw-YAW)
     return loc, vec, rot
 
-def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None):
+def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None,accx=None, accy=None):
     X = route.location.x
     Y = route.location.y
     YAW = route.rotation.yaw * np.pi/180
@@ -203,14 +202,41 @@ def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None):
 
     # Compute the transformation
 
-    T = np.array([x-X, y-Y])
+    T = np.array([x-X, y-Y]) if x is not None else None
 
     S = np.array([vx, vy])
+
+    A = np.array([accx, accy])
     
     # Compute the transformed point
     loc = np.dot(R, T) if x is not None else None
     vec = np.dot(R, S) if vx is not None else None
     rot = np.array(yaw-YAW) if yaw is not None else None
+    acc = np.dot(R, A) if accx is not None else None
+
+    if accx == None:
+        return loc, vec, rot
+    else:
+        return loc, vec, rot, acc
+
+def frenet_to_inertial(route,s=None,d=None,vs=None,vd=None,rot=None,acc=None):
+    X = route.location.x
+    Y = route.location.y
+    YAW = route.rotation.yaw * np.pi/180
+
+    # Compute the rotation matrix
+    R_reverse = np.array([[math.cos(YAW), -math.sin(YAW)], [math.sin(YAW), math.cos(YAW)]])
+
+    # Compute the transformation
+
+    T = np.array([s, d])
+
+    S = np.array([vs, vd])
+    
+    # Compute the transformed point
+    loc = np.dot(R_reverse, T) + np.array([X,Y])
+    vec = np.dot(R_reverse, S)
+    rot = np.array(rot+YAW)
     
     return loc, vec, rot
 
