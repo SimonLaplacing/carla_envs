@@ -51,19 +51,19 @@ class ReplayBuffer:
         if episode_step > self.max_episode_len:
             self.max_episode_len = episode_step
 
-    def get_adv(self):
+    def get_adv(self,max_episode_len):
         # Calculate the advantage using GAE
-        v = self.buffer['v'][:, :self.max_episode_len]
-        v_next = self.buffer['v'][:, 1:self.max_episode_len + 1]
-        r = self.buffer['r'][:, :self.max_episode_len]
-        dw = self.buffer['dw'][:, :self.max_episode_len]
-        active = self.buffer['active'][:, :self.max_episode_len]
+        v = self.buffer['v'][:, :max_episode_len]
+        v_next = self.buffer['v'][:, 1:max_episode_len + 1]
+        r = self.buffer['r'][:, :max_episode_len]
+        dw = self.buffer['dw'][:, :max_episode_len]
+        active = self.buffer['active'][:, :max_episode_len]
         adv = np.zeros_like(r)  # adv.shape=(batch_size,max_episode_len)
         gae = 0
         with torch.no_grad():  # adv and v_target have no gradient
             # deltas.shape=(batch_size,max_episode_len)
             deltas = r + self.gamma * v_next * (1 - dw) - v
-            for t in reversed(range(self.max_episode_len)):
+            for t in reversed(range(max_episode_len)):
                 gae = deltas[:, t] + self.gamma * self.lamda * gae  # gae.shape=(batch_size)
                 adv[:, t] = gae
             v_target = adv + v  # v_target.shape(batch_size,max_episode_len)
@@ -73,22 +73,22 @@ class ReplayBuffer:
                 adv = ((adv - np.nanmean(adv_copy)) / (np.nanstd(adv_copy) + 1e-5))
         return adv, v_target
     
-    def get_om_real_a(self):
-        s = self.buffer['s'][:,:self.max_episode_len]
-        s_next = self.buffer['s'][:,1:self.max_episode_len + 1]
+    def get_om_real_a(self,max_episode_len):
+        s = self.buffer['s'][:,:max_episode_len]
+        s_next = self.buffer['s'][:,1:max_episode_len + 1]
         delta = s_next - s
         om_real_a = delta[:,:,10:13]
         return om_real_a
 
-    def get_training_data(self):
-        adv, v_target = self.get_adv()
-        om_real_a = self.get_om_real_a()
-        batch = {'s': torch.tensor(self.buffer['s'][:, :self.max_episode_len], dtype=torch.float32),
-                 'p': torch.tensor(self.buffer['p'][:, :self.max_episode_len], dtype=torch.float32),
-                 'a': torch.tensor(self.buffer['a'][:, :self.max_episode_len], dtype=torch.float32),  
-                 'a_logprob': torch.tensor(self.buffer['a_logprob'][:, :self.max_episode_len], dtype=torch.float32),
+    def get_training_data(self,max_episode_len):
+        adv, v_target = self.get_adv(max_episode_len)
+        om_real_a = self.get_om_real_a(max_episode_len)
+        batch = {'s': torch.tensor(self.buffer['s'][:, :max_episode_len], dtype=torch.float32),
+                 'p': torch.tensor(self.buffer['p'][:, :max_episode_len], dtype=torch.float32),
+                 'a': torch.tensor(self.buffer['a'][:, :max_episode_len], dtype=torch.float32),  
+                 'a_logprob': torch.tensor(self.buffer['a_logprob'][:, :max_episode_len], dtype=torch.float32),
                  'om_real_a': torch.tensor(om_real_a, dtype=torch.float32),
-                 'active': torch.tensor(self.buffer['active'][:, :self.max_episode_len], dtype=torch.float32),
+                 'active': torch.tensor(self.buffer['active'][:, :max_episode_len], dtype=torch.float32),
                  'adv': torch.tensor(adv, dtype=torch.float32),
                  'v_target': torch.tensor(v_target, dtype=torch.float32)}
 

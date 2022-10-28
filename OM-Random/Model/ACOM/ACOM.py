@@ -7,7 +7,8 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, Sequenti
 from torch.distributions import Normal, MultivariateNormal
 import copy
 from memory_profiler import profile
-from torchvision.models import resnet18
+from torchvision.models import resnet18, efficientnet_b0
+import torchvision.transforms as transforms
 
 ################################## set device ##################################
 print("============================================================================================")
@@ -37,8 +38,11 @@ class Actor_Critic_RNN(nn.Module):
         self.args = args
         self.activate_func = [nn.ReLU(), nn.Tanh()][args.use_tanh]  # Trick10: use tanh
         # BEV
-        self.BEV_layer = resnet18(pretrained=True)
-        self.BEV_layer.fc = torch.nn.Linear(512,args.hidden_dim1)
+        # self.BEV_layer = resnet18(pretrained=True)
+        # self.BEV_layer.fc = torch.nn.Linear(512,args.hidden_dim1)
+        self.Norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        self.BEV_layer = efficientnet_b0(pretrained=True)
+        self.BEV_fc = nn.Linear(1000, args.hidden_dim1)
 
         # actor_init
         self.actor_rnn_hidden = None
@@ -50,7 +54,7 @@ class Actor_Critic_RNN(nn.Module):
             self.actor_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         self.actor_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
-        self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim)
+        self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
 
         # critic_init
         self.critic_rnn_hidden = None
@@ -73,10 +77,11 @@ class Actor_Critic_RNN(nn.Module):
             self.OM_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         self.OM_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.OMmean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
-        self.OMstd_layer = nn.Linear(args.hidden_dim2, args.action_dim)
+        # self.OMstd_layer = nn.Linear(args.hidden_dim2, args.action_dim)
 
         if args.use_orthogonal_init:
             # print("------use orthogonal init------")
+            orthogonal_init(self.BEV_fc)
             orthogonal_init(self.actor_fc11)
             orthogonal_init(self.actor_fc12)
             orthogonal_init(self.actor_fc2)
@@ -90,7 +95,7 @@ class Actor_Critic_RNN(nn.Module):
             orthogonal_init(self.OM_fc12)
             orthogonal_init(self.OM_fc2)
             orthogonal_init(self.OMmean_layer)
-            orthogonal_init(self.OMstd_layer)
+            # orthogonal_init(self.OMstd_layer)
             if self.args.use_gru or self.args.use_lstm:
                 orthogonal_init(self.actor_rnn)
                 orthogonal_init(self.critic_rnn)
@@ -108,8 +113,11 @@ class Actor_Critic_RNN(nn.Module):
         output = self.activate_func(self.actor_fc2(output))
         mean = torch.tanh(self.mean_layer(output))
         std = torch.exp(torch.tanh(self.std_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
-        std = self.args.init_std * torch.diag_embed(std)
-        dist = MultivariateNormal(mean, std)  # Get the Gaussian distribution
+        std = std.view(std.size()[0],std.size()[1],self.args.action_dim,self.args.action_dim)
+        std = self.args.init_std * torch.tril(std)
+        
+        # print(std,std.shape)
+        dist = MultivariateNormal(mean, scale_tril=std)  # Get the Gaussian distribution, Using scale_tril will be more efficient
         return mean, std, dist
 
     def critic(self, s, p, om_a):
@@ -137,14 +145,16 @@ class Actor_Critic_RNN(nn.Module):
         mean = torch.tanh(self.OMmean_layer(output))
         scale = torch.tensor([0.03,0.0075,0.005]).to(device)
         mean = scale*mean
-        std = torch.exp(torch.tanh(self.OMstd_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
-        std = self.args.init_std * torch.diag_embed(std)
-        dist = MultivariateNormal(mean, std)  # Get the Gaussian distribution
-        return mean, std, dist
+        # std = torch.exp(torch.tanh(self.OMstd_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
+        # std = self.args.init_std * torch.diag_embed(std)
+        # dist = MultivariateNormal(mean, std)  # Get the Gaussian distribution
+        return mean, None, None
 
     def BEV(self, p):
+        p = self.Norm(p)
         p = self.BEV_layer(p)
         p.detach_()
+        p = self.activate_func(self.BEV_fc(p))
         return p.unsqueeze(1)
 
 class PPO_RNN:
@@ -178,6 +188,7 @@ class PPO_RNN:
             self.ac.OM_rnn_hidden = None
     # @profile(stream=open('memory_profile.log','w+'))
     def choose_action(self, s, p, evaluate=False):
+        self.ac.eval()
         with torch.no_grad():
             p = np.ascontiguousarray(p)
             p = torch.as_tensor(p, dtype=torch.float).unsqueeze(0)
@@ -201,6 +212,7 @@ class PPO_RNN:
         return a.cpu().numpy().flatten(), a_logprob.cpu().numpy().flatten(), p.cpu()
 
     def get_value(self, s, p):
+        self.ac.eval()
         with torch.no_grad():
             p = np.ascontiguousarray(p)
             p = torch.as_tensor(p, dtype=torch.float).unsqueeze(0)
@@ -215,45 +227,65 @@ class PPO_RNN:
             # value = torch.squeeze(s,-2)
             return value.cpu().numpy().flatten()
 
-    def train(self, replay_buffer, total_steps):
-        batch = replay_buffer.get_training_data()  # Get training data
-        # batch = batch.to(device)
+    def train(self, total_steps, replay_buffer1, replay_buffer2=None):
+        self.ac.train()
+        if replay_buffer2==None:
+            batch = replay_buffer1.get_training_data(replay_buffer1.max_episode_len)  # Get training data
+            batch_size = self.batch_size
+            mini_batch_size = self.mini_batch_size
+        else:
+            max_episode_len = max(replay_buffer1.max_episode_len,replay_buffer2.max_episode_len)
+            batch = replay_buffer1.get_training_data(max_episode_len)  # Get training data
+            batch2 = replay_buffer2.get_training_data(max_episode_len)  # Get training data
+            for key in batch:
+                batch[key] = torch.cat([batch[key],batch2[key]],0)
+            batch_size = 2 * self.batch_size
+            mini_batch_size = 2 * self.mini_batch_size
         # Optimize policy for K epochs:
-        for _ in range(self.K_epochs):
-            for index in BatchSampler(SequentialSampler(range(self.batch_size)), self.mini_batch_size, False):
-                # If use RNN, we need to reset the rnn_hidden of the actor and critic.
-                if self.args.use_gru or self.args.use_lstm:
-                    self.reset_rnn_hidden()
-                om_a_now,_,_ = self.ac.OM(batch['s'][index].to(device),batch['p'][index].to(device))
-                _,_,dist_now = self.ac.actor(batch['s'][index].to(device),batch['p'][index].to(device),om_a_now)  # logits_now.shape=(mini_batch_size, max_episode_len, action_dim)
-                values_now = self.ac.critic(batch['s'][index].to(device),batch['p'][index].to(device),om_a_now).squeeze(-1)  # values_now.shape=(mini_batch_size, max_episode_len)
+        try:
+            for _ in range(self.K_epochs):
+                for index in BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, False):
+                    # If use RNN, we need to reset the rnn_hidden of the actor and critic.
+                    if self.args.use_gru or self.args.use_lstm:
+                        self.reset_rnn_hidden()
+                    om_a_now,_,_ = self.ac.OM(batch['s'][index].to(device),batch['p'][index].to(device))
+                    _,_,dist_now = self.ac.actor(batch['s'][index].to(device),batch['p'][index].to(device),om_a_now)  # logits_now.shape=(mini_batch_size, max_episode_len, action_dim)
+                    values_now = self.ac.critic(batch['s'][index].to(device),batch['p'][index].to(device),om_a_now).squeeze(-1)  # values_now.shape=(mini_batch_size, max_episode_len)
 
-                dist_entropy = dist_now.entropy()  # shape(mini_batch_size, max_episode_len)
-                a_logprob_now = dist_now.log_prob(batch['a'][index].to(device))  # shape(mini_batch_size, max_episode_len)
-                # a/b=exp(log(a)-log(b))
-                ratios = torch.exp(a_logprob_now - batch['a_logprob'][index].to(device))  # shape(mini_batch_size, max_episode_len)
-                # print('ratio: ',ratios.size())
-                # actor loss
-                surr1 = ratios * batch['adv'][index].to(device)
-                surr2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * batch['adv'][index].to(device)
-                actor_loss = -torch.min(surr1, surr2) - self.entropy_coef * dist_entropy  # shape(mini_batch_size, max_episode_len)
-                actor_loss = (actor_loss * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
+                    dist_entropy = dist_now.entropy()  # shape(mini_batch_size, max_episode_len)
+                    a_logprob_now = dist_now.log_prob(batch['a'][index].to(device))  # shape(mini_batch_size, max_episode_len)
+                    # a/b=exp(log(a)-log(b))
+                    ratios = torch.exp(a_logprob_now - batch['a_logprob'][index].to(device))  # shape(mini_batch_size, max_episode_len)
+                    # print('ratio: ',ratios.size())
+                    # actor loss
+                    surr1 = ratios * batch['adv'][index].to(device)
+                    surr2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * batch['adv'][index].to(device)
+                    actor_loss = -torch.min(surr1, surr2) - self.entropy_coef * dist_entropy  # shape(mini_batch_size, max_episode_len)
+                    actor_loss = (actor_loss * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
+                    # print('actor_loss: ',surr1,surr2,ratios,dist_entropy)
 
-                # critic_loss
-                critic_loss = (values_now - batch['v_target'][index].to(device)) ** 2
-                critic_loss = (critic_loss * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
+                    # critic_loss
+                    critic_loss = (values_now - batch['v_target'][index].to(device)) ** 2
+                    critic_loss = (critic_loss * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
 
-                # om_loss
-                om_loss = (om_a_now - batch['om_real_a'][index].to(device)) ** 2
-                om_loss = (om_loss.mean(axis=-1,keepdim=False) * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
+                    # om_loss
+                    om_loss = (om_a_now - batch['om_real_a'][index].to(device)) ** 2
+                    om_loss = (om_loss.mean(axis=-1,keepdim=False) * batch['active'][index].to(device)).sum() / batch['active'][index].to(device).sum()
 
-                # Update
-                self.optimizer.zero_grad()
-                loss = actor_loss + critic_loss * 0.5 + om_loss * 0.5
-                loss.backward()
-                if self.use_grad_clip:  # Trick 7: Gradient clip
-                    torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 0.5)
-                self.optimizer.step()
+                    # Update
+                    self.optimizer.zero_grad()
+                    loss = actor_loss + critic_loss * 0.5 + om_loss * 0.5
+                    # print('all kinds of loss:            ', actor_loss,critic_loss,om_loss)
+                    loss.backward()
+                    if self.use_grad_clip:  # Trick 7: Gradient clip
+                        torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 0.5)
+                    self.optimizer.step()
+        except ValueError:
+            s = batch['s'].detach().cpu().numpy()
+            p = batch['p'].detach().cpu().numpy()
+            om = om_a_now.detach().cpu().numpy().reshape(1,-1)
+            print(s,'\n',p,'\n',om)
+
         if self.use_lr_decay:  # Trick 6:learning rate Decay
             self.lr_decay(total_steps)
 

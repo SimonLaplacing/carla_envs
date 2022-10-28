@@ -1,3 +1,4 @@
+from xml.etree.ElementTree import PI
 import numpy as np
 
 import carla
@@ -9,6 +10,8 @@ from utils.global_route_planner import GlobalRoutePlanner
 from utils.controller import VehiclePIDController
 import utils.misc as misc
 from memory_profiler import profile
+from utils.carla_birdeye_view import BirdViewProducer, BirdViewCropType, PixelDimensions
+from cv2 import cv2 as cv
 
 class Create_Envs(object):
     def __init__(self,args,directory):
@@ -33,6 +36,7 @@ class Create_Envs(object):
         self.npc_transform = 0
         self.H = args.H
         self.W = args.W
+        self.birdViewProducer = None
         self.directory = directory
         self.ego_controller = None
         self.npc_controller = None
@@ -70,6 +74,7 @@ class Create_Envs(object):
 
         # 蓝图
         self.blueprint_library = self.world.get_blueprint_library()
+        self.birdViewProducer = BirdViewProducer(self.client, target_size=PixelDimensions(width=self.W, height=self.H), pixels_per_meter=5, crop_type=BirdViewCropType.FRONT_AND_REAR_AREA, render_lanes_on_junctions=False)
         return self.world
 
     def Create_actors(self): 
@@ -153,10 +158,13 @@ class Create_Envs(object):
         npc_collision = SS.CollisionSensor(npc)
         # ego_invasion = SS.LaneInvasionSensor(ego)
         # npc_invasion = SS.LaneInvasionSensor(npc)
-        ego_camera = SS.Camera(ego, 'ego', self.directory, self.H, self.W)
-        npc_camera = SS.Camera(npc, 'npc', self.directory, self.H, self.W)
+        # ego_camera = SS.Camera(ego, 'ego', self.directory, self.H, self.W)
+        # npc_camera = SS.Camera(npc, 'npc', self.directory, self.H, self.W)
         # self.sensor_list.extend([[ego_collision,ego_collision],[npc_collision,npc_collision]])
-        self.sensor_list.extend([[ego_collision,ego_camera],[npc_collision,npc_camera]])
+
+        self.sensor_list.extend([[ego_collision,ego_collision],[npc_collision,npc_collision]])
+        
+        # 车辆初始参数
         ego_target_speed = carla.Vector3D(16.5,0,0) # 16.5
         npc_target_speed = carla.Vector3D(20,0,0) # 20
         self.ego_list[0].set_target_velocity(ego_target_speed)
@@ -195,7 +203,7 @@ class Create_Envs(object):
 
     # 车辆控制
     def set_vehicle_control(self,ego_action,npc_action,ego_step,npc_step):
-        a,b,c,d = 2,0.25,0.2,-0.08
+        a,b,c,d = 0.5,0.1,0.2,-0.08
         ego_x,ego_y,ego_speed = ego_action
         npc_x,npc_y,npc_speed = npc_action
         if ego_speed >= 0:
@@ -208,7 +216,7 @@ class Create_Envs(object):
             npc_color = carla.Color(int(154-100*ego_speed),0,0)
 
         ego_speed = c * ego_speed + d + misc.get_speed(self.ego_list[0]) # more acceleration
-        npc_speed = 0 * npc_speed + d + misc.get_speed(self.npc_list[0]) # more acceleration
+        npc_speed = c * npc_speed + d + misc.get_speed(self.npc_list[0]) # more acceleration
 
         ego_waypoint = carla.Transform()
         npc_waypoint = carla.Transform()
@@ -228,7 +236,7 @@ class Create_Envs(object):
         npc_f_loc,npc_vec,npc_yaw = misc.inertial_to_frenet(npc_route,npc_next_transform.location.x,npc_next_transform.location.y,npc_velocity.x,npc_velocity.y,npc_yaw)
 
         ego_i_loc,_,_ = misc.frenet_to_inertial(ego_route,ego_f_loc[0]+a*(ego_x+1.001),ego_f_loc[1]+b*ego_y,ego_vec[0],ego_vec[1],ego_yaw)
-        npc_i_loc,_,_ = misc.frenet_to_inertial(npc_route,npc_f_loc[0]+a*(npc_x+1.001),npc_f_loc[1]+0*npc_y,npc_vec[0],npc_vec[1],npc_yaw)
+        npc_i_loc,_,_ = misc.frenet_to_inertial(npc_route,npc_f_loc[0]+a*(npc_x+1.001),npc_f_loc[1]+b*npc_y,npc_vec[0],npc_vec[1],npc_yaw)
 
         ego_waypoint.location = carla.Location(x=ego_i_loc[0], y=ego_i_loc[1])
         npc_waypoint.location = carla.Location(x=npc_i_loc[0], y=npc_i_loc[1])
@@ -291,8 +299,22 @@ class Create_Envs(object):
         ego_ob_y = (obstacle_next_transform.location.y-ego_next_transform.location.y)
         ego_ob = np.sqrt(ego_ob_x**2+ego_ob_y**2)
 
-        ego_BEV = self.sensor_list[0][1].get_BEV()
-        npc_BEV = self.sensor_list[1][1].get_BEV()
+        ego_BEV_ = self.birdViewProducer.produce(agent_vehicle=self.ego_list[0])
+        npc_BEV_ = self.birdViewProducer.produce(agent_vehicle=self.npc_list[0])
+        # ego_BEV = ego_BEV_.swapaxes(0,2).swapaxes(1,2)
+        # ego_BEV = npc_BEV_.swapaxes(0,2).swapaxes(1,2)
+
+        ego_rgb = cv.cvtColor(BirdViewProducer.as_rgb(ego_BEV_), cv.COLOR_BGR2RGB)
+        npc_rgb = cv.cvtColor(BirdViewProducer.as_rgb(npc_BEV_), cv.COLOR_BGR2RGB)
+        # NOTE imshow requires BGR color model
+        # cv.imshow("BirdView RGB", ego_rgb)
+        # cv.imwrite(self.directory + '/save_1.png', ego_rgb)
+
+        ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
+        npc_BEV = npc_rgb.swapaxes(0,2).swapaxes(1,2)
+
+        # ego_BEV = self.sensor_list[0][1].get_BEV()
+        # npc_BEV = self.sensor_list[1][1].get_BEV()
 
         ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_next_disX/10,ego_next_disY/10,ego_vec[0]/40,ego_vec[1]/40,ego_next_vec[0]/40,ego_next_vec[1]/40,np.sin(ego_yaw/2),np.sin(ego_next_yaw/2),
         ego_npc_disX/40,ego_npc_disY/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2),
@@ -305,12 +327,12 @@ class Create_Envs(object):
         npc_next_disX = npc_next_loc[0]
         npc_next_disY = npc_next_loc[1]
 
-        npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
-        npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
-        npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-        npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
-        npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-        npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
+        # npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
+        # npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
+        # npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
+        # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
+        # npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
+        # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
 
         npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/10,npc_vec[0]/40,npc_vec[1]/40,npc_next_vec[0]/40,npc_next_vec[1]/40,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),
         npc_ego_disX/40,npc_ego_disY/10,misc.get_speed(self.ego_list[0])/40,npc_ego_vec[0]/30,npc_ego_vec[1]/30,np.sin(npc_ego_yaw/2),
@@ -335,17 +357,6 @@ class Create_Envs(object):
         if step >= self.args.max_length_of_trajectory - 1:
             timeout = 1
 
-        # ego_reward = ((-50)*ego_col[0] + (0.0001)*(ego_dis + ego_ob) 
-        # + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-10)*np.abs(np.sin(ego_yaw/2)) 
-        # + (-0.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/10)**2 + (-5)*np.abs(np.sin(ego_next_yaw/2))
-        # + 30*ego_bonus - 0.002*step
-        # - 0.25*abs(ego_acc[1]))
-
-        # npc_reward = ((-50)*npc_col[0] + (0.0001)*(npc_dis + npc_ob)
-        # + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-10)*np.abs(np.sin(npc_yaw/2))
-        # + (-0.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-5)*np.abs(np.sin(npc_next_yaw/2)) 
-        # + 30*npc_bonus - 0.002*step
-        # - 0.25*abs(npc_acc[1]))
         # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
         # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
         
@@ -376,8 +387,22 @@ class Create_Envs(object):
             npccol_num = 0
             npc_finish = 0
 
-        ego_reward = (-1)*ego_col[0] + (-0.5)*timeout + 0.1*ego_bonus
-        npc_reward = (-1)*npc_col[0] + (-0.5)*timeout + 0.1*npc_bonus  
+        #simple reward
+        ego_reward = (-1)*ego_col[0] + (-0.8)*timeout + 0.15*ego_bonus
+        npc_reward = (-1)*npc_col[0] + (-0.8)*timeout + 0.15*npc_bonus
+
+        #reward shaping
+        # ego_reward = ((-50)*ego_col[0] + (0.001)*(ego_dis + ego_ob) 
+        # + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-20)*np.abs(np.sin(ego_yaw/2)) 
+        # + (-0.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/10)**2 + (-5)*np.abs(np.sin(ego_next_yaw/2))
+        # + 30*ego_bonus - 10*timeout
+        # - 0.25*abs(ego_acc[1]))
+
+        # npc_reward = ((-50)*npc_col[0] + (0.001)*(npc_dis + npc_ob)
+        # + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-20)*np.abs(np.sin(npc_yaw/2))
+        # + (-0)*(npc_next_disX/10)**2 + (-0)*(npc_next_disY/10)**2 + (-0)*np.abs(np.sin(npc_next_yaw/2)) 
+        # + 30*npc_bonus - 10*timeout
+        # - 0.25*abs(npc_acc[1]))  
         return [ego_next_state,ego_reward,npc_next_state,npc_reward,egocol_num,ego_finish,npccol_num,npc_finish,ego_BEV,npc_BEV]
 
     # 车辆动作空间

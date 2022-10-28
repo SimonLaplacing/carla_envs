@@ -105,7 +105,7 @@ class Camera(object):
         """Constructor method"""
         # self.sensor = None
         self._parent = parent_actor
-        self.recording = False
+        self.recording = True
         self.directory = directory
         self.name = name
         self.BEV = np.zeros((3, H, W), dtype=np.uint8)
