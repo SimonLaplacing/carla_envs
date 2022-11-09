@@ -73,21 +73,20 @@ class ReplayBuffer:
                 adv = ((adv - np.nanmean(adv_copy)) / (np.nanstd(adv_copy) + 1e-5))
         return adv, v_target
     
-    def get_om_real_a(self,max_episode_len):
-        s = self.buffer['s'][:,:max_episode_len]
-        s_next = self.buffer['s'][:,1:max_episode_len + 1]
-        delta = s_next - s
-        om_real_a = delta[:,:,10:13]
-        return om_real_a
+    # def get_om_real_a(self,max_episode_len):
+    #     s = self.buffer['s'][:,:max_episode_len]
+    #     s_next = self.buffer['s'][:,1:max_episode_len + 1]
+    #     delta = s_next - s
+    #     om_real_a = delta[:,:,10:13]
+    #     return om_real_a
 
-    def get_training_data(self,max_episode_len):
+    def get_training_data(self,max_episode_len, OM_buffer):
         adv, v_target = self.get_adv(max_episode_len)
-        om_real_a = self.get_om_real_a(max_episode_len)
         batch = {'s': torch.tensor(self.buffer['s'][:, :max_episode_len], dtype=torch.float32),
                  'p': torch.tensor(self.buffer['p'][:, :max_episode_len], dtype=torch.float32),
                  'a': torch.tensor(self.buffer['a'][:, :max_episode_len], dtype=torch.float32),  
                  'a_logprob': torch.tensor(self.buffer['a_logprob'][:, :max_episode_len], dtype=torch.float32),
-                 'om_real_a': torch.tensor(om_real_a, dtype=torch.float32),
+                 'om_real_a': torch.tensor(OM_buffer.buffer['a'][:, :max_episode_len], dtype=torch.float32),
                  'active': torch.tensor(self.buffer['active'][:, :max_episode_len], dtype=torch.float32),
                  'adv': torch.tensor(adv, dtype=torch.float32),
                  'v_target': torch.tensor(v_target, dtype=torch.float32)}

@@ -4,13 +4,13 @@ import numpy as np
 import carla
 from carla import Transform, Location, Rotation
 
-import utils.Simple_Sensors as SS
-from utils.global_route_planner_dao import GlobalRoutePlannerDAO
-from utils.global_route_planner import GlobalRoutePlanner
-from utils.controller import VehiclePIDController
+import Envs.Simple_Sensors as SS
+from Lane_Decision.global_route_planner_dao import GlobalRoutePlannerDAO
+from Lane_Decision.global_route_planner import GlobalRoutePlanner
+from Track_Controller.controller import VehiclePIDController
 import utils.misc as misc
 from memory_profiler import profile
-from utils.carla_birdeye_view import BirdViewProducer, BirdViewCropType, PixelDimensions
+from Envs.carla_birdeye_view import BirdViewProducer, BirdViewCropType, PixelDimensions
 from cv2 import cv2 as cv
 
 class Create_Envs(object):
@@ -34,8 +34,6 @@ class Create_Envs(object):
         self.c_tau = args.c_tau
         self.ego_transform = 0
         self.npc_transform = 0
-        self.H = args.H
-        self.W = args.W
         self.birdViewProducer = None
         self.directory = directory
         self.ego_controller = None
@@ -74,7 +72,7 @@ class Create_Envs(object):
 
         # 蓝图
         self.blueprint_library = self.world.get_blueprint_library()
-        self.birdViewProducer = BirdViewProducer(self.client, target_size=PixelDimensions(width=self.W, height=self.H), pixels_per_meter=5, crop_type=BirdViewCropType.FRONT_AND_REAR_AREA, render_lanes_on_junctions=False)
+        self.birdViewProducer = BirdViewProducer(self.client, target_size=PixelDimensions(width=self.args.W, height=self.args.H), pixels_per_meter=self.args.res, crop_type=BirdViewCropType.FRONT_AND_REAR_AREA, render_lanes_on_junctions=False)
         return self.world
 
     def Create_actors(self): 
@@ -203,49 +201,69 @@ class Create_Envs(object):
 
     # 车辆控制
     def set_vehicle_control(self,ego_action,npc_action,ego_step,npc_step):
-        a,b,c,d = 0.5,0.1,0.2,-0.08
-        ego_x,ego_y,ego_speed = ego_action
-        npc_x,npc_y,npc_speed = npc_action
-        if ego_speed >= 0:
-            ego_color = carla.Color(0,int(154+100*ego_speed),0)
+        if not self.args.direct_control:
+            a,b,c,d = 0.5,0.1,0.2,-0.08
+            ego_x,ego_y,ego_speed = ego_action
+            npc_x,npc_y,npc_speed = npc_action
+            if ego_speed >= 0:
+                ego_color = carla.Color(0,int(154+100*ego_speed),0)
+            else:
+                ego_color = carla.Color(int(154-100*ego_speed),0,0)
+            if npc_speed >= 0:
+                npc_color = carla.Color(0,int(154+100*ego_speed),0)
+            else:
+                npc_color = carla.Color(int(154-100*ego_speed),0,0)
+
+            ego_speed = c * ego_speed + d + misc.get_speed(self.ego_list[0]) # more acceleration
+            npc_speed = c * npc_speed + d + misc.get_speed(self.npc_list[0]) # more acceleration
+
+            ego_waypoint = carla.Transform()
+            npc_waypoint = carla.Transform()
+
+            ego_route = self.ego_route[ego_step]
+            npc_route = self.npc_route[npc_step]
+
+            ego_next_transform = self.ego_list[0].get_transform()
+            npc_next_transform = self.npc_list[0].get_transform()
+            # 速度、加速度
+            ego_velocity = self.ego_list[0].get_velocity()
+            npc_velocity = self.npc_list[0].get_velocity()
+            ego_yaw = ego_next_transform.rotation.yaw * np.pi/180
+            npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
+            
+            ego_f_loc,ego_vec,ego_yaw = misc.inertial_to_frenet(ego_route,ego_next_transform.location.x,ego_next_transform.location.y,ego_velocity.x,ego_velocity.y,ego_yaw)
+            npc_f_loc,npc_vec,npc_yaw = misc.inertial_to_frenet(npc_route,npc_next_transform.location.x,npc_next_transform.location.y,npc_velocity.x,npc_velocity.y,npc_yaw)
+
+            ego_i_loc,_,_ = misc.frenet_to_inertial(ego_route,ego_f_loc[0]+a*(ego_x+1.001),ego_f_loc[1]+b*ego_y,ego_vec[0],ego_vec[1],ego_yaw)
+            npc_i_loc,_,_ = misc.frenet_to_inertial(npc_route,npc_f_loc[0]+a*(npc_x+1.001),npc_f_loc[1]+b*npc_y,npc_vec[0],npc_vec[1],npc_yaw)
+
+            ego_waypoint.location = carla.Location(x=ego_i_loc[0], y=ego_i_loc[1])
+            npc_waypoint.location = carla.Location(x=npc_i_loc[0], y=npc_i_loc[1])
+
+            self.world.debug.draw_point(location = ego_waypoint.location, color = ego_color, life_time = 1)
+            self.world.debug.draw_point(location = npc_waypoint.location, color = npc_color, life_time = 1)
+
+            ego_control = self.ego_controller.run_step(ego_speed,ego_waypoint)
+            npc_control = self.npc_controller.run_step(npc_speed,npc_waypoint)
         else:
-            ego_color = carla.Color(int(154-100*ego_speed),0,0)
-        if npc_speed >= 0:
-            npc_color = carla.Color(0,int(154+100*ego_speed),0)
-        else:
-            npc_color = carla.Color(int(154-100*ego_speed),0,0)
+            ego_move,ego_steer = ego_action
+            npc_move,npc_steer = npc_action
 
-        ego_speed = c * ego_speed + d + misc.get_speed(self.ego_list[0]) # more acceleration
-        npc_speed = c * npc_speed + d + misc.get_speed(self.npc_list[0]) # more acceleration
+            ego_steer = self.args.c_tau*ego_steer + (1-self.args.c_tau)*self.ego_list[0].get_control().steer
+            npc_steer = self.args.c_tau*npc_steer + (1-self.args.c_tau)*self.npc_list[0].get_control().steer
+            if ego_move >= 0:
+                ego_throttle = self.args.c_tau*ego_move + (1-self.args.c_tau)*self.ego_list[0].get_control().throttle
+                ego_control = carla.VehicleControl(throttle = ego_throttle, steer = ego_steer, brake = 0)
+            elif ego_move < 0:
+                ego_brake = -self.args.c_tau*ego_move + (1-self.args.c_tau)*self.ego_list[0].get_control().brake
+                ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
+            if npc_move >= 0:
+                npc_throttle = self.args.c_tau*npc_move + (1-self.args.c_tau)*self.npc_list[0].get_control().throttle
+                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = npc_steer, brake = 0)
+            elif npc_move < 0:
+                npc_brake = -self.args.c_tau*npc_move + (1-self.args.c_tau)*self.npc_list[0].get_control().brake
+                npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = npc_brake)
 
-        ego_waypoint = carla.Transform()
-        npc_waypoint = carla.Transform()
-
-        ego_route = self.ego_route[ego_step]
-        npc_route = self.npc_route[npc_step]
-
-        ego_next_transform = self.ego_list[0].get_transform()
-        npc_next_transform = self.npc_list[0].get_transform()
-        # 速度、加速度
-        ego_velocity = self.ego_list[0].get_velocity()
-        npc_velocity = self.npc_list[0].get_velocity()
-        ego_yaw = ego_next_transform.rotation.yaw * np.pi/180
-        npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
-        
-        ego_f_loc,ego_vec,ego_yaw = misc.inertial_to_frenet(ego_route,ego_next_transform.location.x,ego_next_transform.location.y,ego_velocity.x,ego_velocity.y,ego_yaw)
-        npc_f_loc,npc_vec,npc_yaw = misc.inertial_to_frenet(npc_route,npc_next_transform.location.x,npc_next_transform.location.y,npc_velocity.x,npc_velocity.y,npc_yaw)
-
-        ego_i_loc,_,_ = misc.frenet_to_inertial(ego_route,ego_f_loc[0]+a*(ego_x+1.001),ego_f_loc[1]+b*ego_y,ego_vec[0],ego_vec[1],ego_yaw)
-        npc_i_loc,_,_ = misc.frenet_to_inertial(npc_route,npc_f_loc[0]+a*(npc_x+1.001),npc_f_loc[1]+b*npc_y,npc_vec[0],npc_vec[1],npc_yaw)
-
-        ego_waypoint.location = carla.Location(x=ego_i_loc[0], y=ego_i_loc[1])
-        npc_waypoint.location = carla.Location(x=npc_i_loc[0], y=npc_i_loc[1])
-
-        self.world.debug.draw_point(location = ego_waypoint.location, color = ego_color, life_time = 1)
-        self.world.debug.draw_point(location = npc_waypoint.location, color = npc_color, life_time = 1)
-
-        ego_control = self.ego_controller.run_step(ego_speed,ego_waypoint)
-        npc_control = self.npc_controller.run_step(npc_speed,npc_waypoint)
         self.ego_list[0].apply_control(ego_control)
         self.npc_list[0].apply_control(npc_control)
 
@@ -316,9 +334,9 @@ class Create_Envs(object):
         # ego_BEV = self.sensor_list[0][1].get_BEV()
         # npc_BEV = self.sensor_list[1][1].get_BEV()
 
-        ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_next_disX/10,ego_next_disY/10,ego_vec[0]/40,ego_vec[1]/40,ego_next_vec[0]/40,ego_next_vec[1]/40,np.sin(ego_yaw/2),np.sin(ego_next_yaw/2),
-        ego_npc_disX/40,ego_npc_disY/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2),
-        ego_ob_loc[0]/30,ego_ob_loc[1]/25])
+        ego_next_state = np.array([ego_target_disX/5,ego_target_disY/10,ego_next_disX/10,ego_next_disY/10,ego_vec[0]/40,ego_vec[1]/40,ego_next_vec[0]/40,ego_next_vec[1]/40,np.sin(ego_yaw/2),np.sin(ego_next_yaw/2), # 自车
+        ego_npc_disX/40,ego_npc_disY/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2), # 外车
+        ego_ob_loc[0]/30,ego_ob_loc[1]/25]) # 障碍
 
         npc_target_disX = npc_f_loc[0]
         npc_target_disY = npc_f_loc[1]
@@ -327,12 +345,12 @@ class Create_Envs(object):
         npc_next_disX = npc_next_loc[0]
         npc_next_disY = npc_next_loc[1]
 
-        # npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
-        # npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
-        # npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-        # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
-        # npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-        # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
+        npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
+        npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
+        npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
+        npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
+        npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
+        npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
 
         npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/10,npc_vec[0]/40,npc_vec[1]/40,npc_next_vec[0]/40,npc_next_vec[1]/40,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),
         npc_ego_disX/40,npc_ego_disY/10,misc.get_speed(self.ego_list[0])/40,npc_ego_vec[0]/30,npc_ego_vec[1]/30,np.sin(npc_ego_yaw/2),
@@ -350,10 +368,10 @@ class Create_Envs(object):
         # nv=-1 if npc_velocity <= 2 else 0
         ego_bonus,npc_bonus,timeout = 0, 0, 0
         
-        if ego_target_disX > -0.5:
+        if ego_target_disX > -1:
             ego_bonus = 1                    
-        if npc_target_disX > -0.5:
-            npc_bonus = 1
+        if npc_target_disX > -1:
+            npc_bonus = 1 
         if step >= self.args.max_length_of_trajectory - 1:
             timeout = 1
 
@@ -388,26 +406,29 @@ class Create_Envs(object):
             npc_finish = 0
 
         #simple reward
-        ego_reward = (-1)*ego_col[0] + (-0.8)*timeout + 0.15*ego_bonus
-        npc_reward = (-1)*npc_col[0] + (-0.8)*timeout + 0.15*npc_bonus
+        # ego_reward = (-1)*ego_col[0] + (-0.6)*timeout + 0.2*ego_bonus
+        # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 0.2*npc_bonus
 
         #reward shaping
-        # ego_reward = ((-50)*ego_col[0] + (0.001)*(ego_dis + ego_ob) 
-        # + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-20)*np.abs(np.sin(ego_yaw/2)) 
-        # + (-0.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/10)**2 + (-5)*np.abs(np.sin(ego_next_yaw/2))
-        # + 30*ego_bonus - 10*timeout
-        # - 0.25*abs(ego_acc[1]))
+        ego_reward = ((-100)*ego_col[0] + (0.001)*(ego_dis + ego_ob) 
+        + (-1)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-20)*np.abs(np.sin(ego_yaw/2)) 
+        + (-0.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/10)**2 + (-10)*np.abs(np.sin(ego_next_yaw/2))
+        + 50*ego_bonus - 50*timeout
+        - 0.25*abs(ego_acc[1]))
 
-        # npc_reward = ((-50)*npc_col[0] + (0.001)*(npc_dis + npc_ob)
-        # + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-20)*np.abs(np.sin(npc_yaw/2))
-        # + (-0)*(npc_next_disX/10)**2 + (-0)*(npc_next_disY/10)**2 + (-0)*np.abs(np.sin(npc_next_yaw/2)) 
-        # + 30*npc_bonus - 10*timeout
-        # - 0.25*abs(npc_acc[1]))  
+        npc_reward = ((-100)*npc_col[0] + (0.001)*(npc_dis + npc_ob)
+        + (-1)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-20)*np.abs(np.sin(npc_yaw/2))
+        + (-0.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-10)*np.abs(np.sin(npc_next_yaw/2)) 
+        + 50*npc_bonus - 50*timeout
+        - 0.25*abs(npc_acc[1]))  
         return [ego_next_state,ego_reward,npc_next_state,npc_reward,egocol_num,ego_finish,npccol_num,npc_finish,ego_BEV,npc_BEV]
 
     # 车辆动作空间
     def get_action_space(self):
-        action_space = [0,0,0] # x,y,speed
+        if self.args.direct_control:
+            action_space = [0,0] # throttle-brake/steer
+        else:
+            action_space = [0,0,0] # x,y,speed
         return action_space
     
     # 车辆状态空间

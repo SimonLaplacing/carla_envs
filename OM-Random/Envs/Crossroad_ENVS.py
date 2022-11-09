@@ -3,10 +3,10 @@ import numpy as np
 import carla
 from carla import Transform, Location, Rotation
 
-import utils.Simple_Sensors as SS
-from utils.global_route_planner_dao import GlobalRoutePlannerDAO
-from utils.global_route_planner import GlobalRoutePlanner
-from utils.controller import VehiclePIDController
+import Envs.Simple_Sensors as SS
+from Lane_Decision.global_route_planner_dao import GlobalRoutePlannerDAO
+from Lane_Decision.global_route_planner import GlobalRoutePlanner
+from Track_Controller.controller import VehiclePIDController
 import utils.misc as misc
 from memory_profiler import profile
 

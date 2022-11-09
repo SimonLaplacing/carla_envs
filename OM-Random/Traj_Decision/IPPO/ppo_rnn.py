@@ -76,8 +76,8 @@ class Actor_Critic_RNN(nn.Module):
         s = self.activate_func(self.actor_fc1(s))
         if self.args.use_gru or self.args.use_lstm:
             s, self.actor_rnn_hidden = self.actor_rnn(s, self.actor_rnn_hidden)
-        output = self.activate_func(s)
-        output = self.activate_func(self.actor_fc2(output))
+        # output = self.activate_func(s)
+        output = self.activate_func(self.actor_fc2(s))
         mean = torch.tanh(self.mean_layer(output))
         std = torch.exp(torch.tanh(self.std_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
         std = self.args.init_std * torch.diag_embed(std)
@@ -88,8 +88,8 @@ class Actor_Critic_RNN(nn.Module):
         s = self.activate_func(self.critic_fc1(s))
         if self.args.use_gru or self.args.use_lstm:
             s, self.critic_rnn_hidden = self.critic_rnn(s, self.critic_rnn_hidden)
-        output = self.activate_func(s)
-        output = self.activate_func(self.critic_fc2(output))
+        # output = self.activate_func(s)
+        output = self.activate_func(self.critic_fc2(s))
         value = self.critic_fc3(output)
         return value
 

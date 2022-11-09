@@ -24,7 +24,7 @@ except IndexError:
     pass
 import carla
 
-from utils.local_planner import RoadOption
+from Lane_Decision.local_planner import RoadOption
 from utils.misc import vector
 
 

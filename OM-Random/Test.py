@@ -1,6 +1,6 @@
 import torch
 a=torch.rand(9,1)
-b=a.view(3,3)
+b=100
 
-print(a,b)
+print(a+b)
 

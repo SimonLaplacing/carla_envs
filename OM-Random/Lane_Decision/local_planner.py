@@ -10,7 +10,7 @@ from collections import deque
 import random
 
 import carla
-from utils.controller import VehiclePIDController
+from Track_Controller.controller import VehiclePIDController
 from utils.misc import draw_waypoints
 
 
