@@ -18,6 +18,8 @@ class Runner:
             import Envs.Crossroad_ENVS as ENVS
         elif self.args.envs == 'highway':
             import Envs.Highway_ENVS as ENVS
+        elif self.args.envs == 'straight':
+            import Envs.Straight_ENVS as ENVS
         
         if self.args.model == 'OMAC':
             from Traj_Decision.ACOM.normalization import Normalization, RewardScaling
@@ -80,7 +82,8 @@ class Runner:
         try:
             if self.args.mode == 'test': 
                 self.ego.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/ego.pkl')
-                self.npc.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/npc.pkl')
+                if self.args.npc_exist:
+                    self.npc.load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/npc.pkl')
             
             evaluate_num = -1  # Record the number of evaluations
             save_num = 1
@@ -122,8 +125,9 @@ class Runner:
                         if self.args.shared_policy:
                             self.ego.train(self.total_steps, self.ego_buffer, self.npc_buffer)  # Training
                         else:
-                            self.ego.train(self.total_steps, self.ego_buffer)  # Training
-                            self.npc.train(self.total_steps, self.npc_buffer)  # Training
+                            self.ego.train(self.total_steps, self.ego_buffer, self.npc_buffer)  # Training
+                            if self.args.npc_exist:
+                                self.npc.train(self.total_steps, self.npc_buffer, self.ego_buffer)  # Training
                     
                         self.ego_buffer.reset_buffer()
                         self.npc_buffer.reset_buffer()
@@ -131,7 +135,8 @@ class Runner:
                     # Save the models
                     if self.total_episode // self.args.save_freq > save_num:
                         self.ego.save(self.save_directory + '/ego.pkl')
-                        self.npc.save(self.save_directory + '/npc.pkl')
+                        if self.args.npc_exist:
+                            self.npc.save(self.save_directory + '/npc.pkl')
                         save_num += 1
                         print('Network Saved')
             
@@ -149,6 +154,7 @@ class Runner:
         ego_offsety = 0
         npc_offsety = 0
         ego_dw, npc_dw = False, False
+        ego_wps,npc_wps = 0, 0
 
         ego_step, npc_step = 1, 1
         ego_state,_,npc_state,_,_,_,_,_,ego_BEV,npc_BEV = self.create_envs.get_vehicle_step(ego_step, npc_step, 0)
@@ -164,8 +170,6 @@ class Runner:
                 ego_state = self.state_norm(ego_state)
                 npc_state = self.state_norm(npc_state)
 
-            ego_path, ego_fplist, ego_best_idx = self.ego_pp.run_step(ego_state, self.f_idx, None, target_speed=10)
-            npc_path, npc_fplist, npc_best_idx = self.npc_pp.run_step(npc_state, self.f_idx, None, target_speed=10)
             ego_a, ego_a_logprob, p = self.ego.choose_action(ego_state, ego_BEV, evaluate=False)
             npc_a, npc_a_logprob, p = self.npc.choose_action(npc_state, npc_BEV, evaluate=False)
             ego_v = self.ego.get_value(ego_state, ego_BEV, npc_a)
@@ -302,7 +306,9 @@ class Runner:
                 if self.args.use_state_norm:
                     ego_state = self.state_norm(ego_state, update=False)
                     npc_state = self.state_norm(npc_state, update=False)
+                t1 = time.time()
                 ego_a, _, _ = self.ego.choose_action(ego_state,ego_BEV, evaluate=True)
+                # print('time:    ',time.time()-t1)
                 npc_a, _, _ = self.npc.choose_action(npc_state,npc_BEV, evaluate=True)
                 self.create_envs.set_vehicle_control(ego_a, npc_a, ego_step, npc_step)
                 frames = 1 # 步长 
@@ -404,30 +410,30 @@ class Runner:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting")
     parser.add_argument("--evaluate_freq", type=float, default=64, help="Evaluate the policy every 'evaluate_freq' steps")
-    parser.add_argument("--save_freq", type=int, default=20, help="Save frequency")
+    parser.add_argument("--save_freq", type=int, default=200, help="Save frequency")
     parser.add_argument("--evaluate_times", type=float, default=1, help="Evaluate times")
 
-    parser.add_argument("--Start_Path", type=bool, default=True, help="Start_Path")
-    parser.add_argument("--carla_dt", type=float, default=0.05, help="dt")
+    parser.add_argument("--Start_Path", type=bool, default=False, help="Start_Path")
+    # parser.add_argument("--carla_dt", type=float, default=0.05, help="dt")
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
-    parser.add_argument("--carla_max_s", type=int, default=3000, help="max_s")
+    parser.add_argument("--carla_max_s", type=int, default=300, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.15, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
+    parser.add_argument("--hidden_dim2", type=int, default=32, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--init_std", type=float, default=0.3, help="std_initialization")
+    parser.add_argument("--lr", type=float, default=8e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.02, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=10, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=12, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
     parser.add_argument("--use_state_norm", type=bool, default=False, help="Trick 2:state normalization")
     parser.add_argument("--use_reward_scaling", type=bool, default=True, help="Trick 4:reward scaling")
-    parser.add_argument("--entropy_coef", type=float, default=0.1, help="Trick 5: policy entropy")
+    parser.add_argument("--entropy_coef", type=float, default=0.01, help="Trick 5: policy entropy")
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Trick 6:learning rate Decay")
     parser.add_argument("--use_grad_clip", type=bool, default=True, help="Trick 7: Gradient clip")
     parser.add_argument("--use_orthogonal_init", type=bool, default=True, help="Trick 8: orthogonal initialization")
@@ -435,20 +441,21 @@ if __name__ == '__main__':
     parser.add_argument("--use_tanh", type=float, default=False, help="Trick 10: tanh activation function")
     parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU") # Priority for GRU
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
-    parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
+    parser.add_argument("--shared_policy", type=bool, default=False, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=9, type=str) # seed
+    parser.add_argument('--save_seed', default=5, type=str) # seed
     parser.add_argument('--load_seed', default=1, type=str) # seed
-    parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=150, type=int) # 最大仿真步数
+    parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数,1代表完全更新，0代表不更新
+    parser.add_argument('--max_length_of_trajectory', default=180, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=448, type=int) # BEV_Height
     parser.add_argument('--W', default=112, type=int) # BEV_Width
 
-    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway
-    parser.add_argument('--model', default='PR2AC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight
+    parser.add_argument('--npc_exist', default=False, type=bool) # multi-agent bool
+    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
 
-    parser.add_argument('--direct_control', default=True, type=bool) # 直接控制
+    parser.add_argument('--direct_control', default=True, type=bool) # 直接控制/PID跟踪
     parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
     parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
     parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长

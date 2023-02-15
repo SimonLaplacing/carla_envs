@@ -28,7 +28,7 @@ parser.add_argument('--Clearning_rate', default=4e-5, type=float) # Critic学习
 parser.add_argument('--gamma', default=0.99, type=int) # discounted factor
 
 parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
-parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
+parser.add_argument('--no_rendering_mode', default=False, type=bool) # 无渲染模式开关
 parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
 
 parser.add_argument('--log', default=False, type=bool) # 日志开关

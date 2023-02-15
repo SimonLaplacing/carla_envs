@@ -43,16 +43,17 @@ class Actor_Critic_RNN(nn.Module):
         self.Norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         self.BEV_layer = efficientnet_b0(pretrained=True)
         self.BEV_fc = nn.Linear(1000, args.hidden_dim1)
+        self.qq = 0
 
         # actor_init
         self.actor_rnn_hidden = None
         self.actor_fc11 = nn.Linear(args.state_dim+args.action_dim, args.hidden_dim1)
         self.actor_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
         if args.use_gru:
-            self.actor_rnn = nn.GRU(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
+            self.actor_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         elif args.use_lstm:
-            self.actor_rnn = nn.LSTM(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
-        self.actor_fc2 = nn.Linear(args.hidden_dim1, args.hidden_dim2)
+            self.actor_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
+        self.actor_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
         self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
 
@@ -61,10 +62,10 @@ class Actor_Critic_RNN(nn.Module):
         self.critic_fc11 = nn.Linear(args.state_dim+args.action_dim, args.hidden_dim1)
         self.critic_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
         if args.use_gru:
-            self.critic_rnn = nn.GRU(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
+            self.critic_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         elif args.use_lstm:
-            self.critic_rnn = nn.LSTM(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
-        self.critic_fc2 = nn.Linear(args.hidden_dim1, args.hidden_dim2)
+            self.critic_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
+        self.critic_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.critic_fc3 = nn.Linear(args.hidden_dim2, 1)
 
         # OM_init
@@ -72,10 +73,10 @@ class Actor_Critic_RNN(nn.Module):
         self.OM_fc11 = nn.Linear(args.state_dim, args.hidden_dim1)
         self.OM_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
         if args.use_gru:
-            self.OM_rnn = nn.GRU(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
+            self.OM_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         elif args.use_lstm:
-            self.OM_rnn = nn.LSTM(2*args.hidden_dim1, args.hidden_dim1, batch_first=True)
-        self.OM_fc2 = nn.Linear(args.hidden_dim1, args.hidden_dim2)
+            self.OM_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
+        self.OM_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.OMmean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
         # self.OMstd_layer = nn.Linear(args.hidden_dim2, args.action_dim)
 
@@ -142,7 +143,10 @@ class Actor_Critic_RNN(nn.Module):
             t_, self.OM_rnn_hidden = self.OM_rnn(t_, self.OM_rnn_hidden)
         # output = self.activate_func(t_)
         output = self.activate_func(self.OM_fc2(t_))
-        mean = torch.tanh(self.OMmean_layer(output))
+        output = self.OMmean_layer(output)
+        mean = torch.tanh(output)
+        if torch.isnan(mean).any():
+            print('error:',self.qq,'\n',p)
         # scale = torch.tensor([0.03,0.0075,0.005]).to(device)
         # mean = scale*mean
         # std = torch.exp(torch.tanh(self.OMstd_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
@@ -152,6 +156,7 @@ class Actor_Critic_RNN(nn.Module):
 
     def BEV(self, p):
         p = self.Norm(p/255)
+        self.qq = p
         p = self.BEV_layer(p)
         p.detach_()
         p = self.activate_func(self.BEV_fc(p))
@@ -227,9 +232,9 @@ class PPO_RNN:
             # value = torch.squeeze(s,-2)
             return value.cpu().numpy().flatten()
 
-    def train(self, total_steps, replay_buffer1, replay_buffer2=None):
+    def train(self, total_steps, replay_buffer1, replay_buffer2):
         self.ac.train()
-        if replay_buffer2==None:
+        if not self.args.shared_policy:
             batch = replay_buffer1.get_training_data(replay_buffer1.max_episode_len,replay_buffer2)  # Get training data
             batch_size = self.batch_size
             mini_batch_size = self.mini_batch_size
