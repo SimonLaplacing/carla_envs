@@ -172,8 +172,8 @@ class Create_Envs(object):
         self.sensor_list.extend([[ego_collision,ego_collision],[npc_collision,npc_collision]])
         
         # 车辆初始参数
-        ego_target_speed = carla.Vector3D(16.5,0,0) # 16.5
-        npc_target_speed = carla.Vector3D(20,0,0) # 20
+        ego_target_speed = carla.Vector3D(20,0,0) # 16.5
+        npc_target_speed = carla.Vector3D(0,0,0) # 20
         self.ego_list[0].set_target_velocity(ego_target_speed)
         self.npc_list[0].set_target_velocity(npc_target_speed)
 
@@ -519,15 +519,15 @@ class Create_Envs(object):
         # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
         #reward shaping
-        ego_reward = ((-100)*ego_col[0] + (0.001)*(ego_dis + ego_ob) 
+        ego_reward = ((-80)*ego_col[0] + (0.001)*(ego_dis + ego_ob) 
         + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) 
         + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/10)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2))
-        + 60*ego_bonus - 0.002*step
+        + 40*ego_bonus - 0.002*step
         - 0.25*abs(ego_acc[1]))
-        npc_reward = ((-100)*npc_col[0] + (0.001)*(npc_dis + npc_ob)
+        npc_reward = ((-80)*npc_col[0] + (0.001)*(npc_dis + npc_ob)
         + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
         + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
-        + 60*npc_bonus - 0.002*step
+        + 40*npc_bonus - 0.002*step
         - 0.25*abs(npc_acc[1]))
           
         return [ego_next_state,ego_reward,npc_next_state,npc_reward,egocol_num,ego_finish,npccol_num,npc_finish,ego_BEV,npc_BEV]

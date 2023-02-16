@@ -418,35 +418,35 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=300, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
     parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=32, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.3, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=8e-5, help="Learning rate of actor")
+    parser.add_argument("--init_std", type=float, default=0.5, help="std_initialization")
+    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.02, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=12, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=15, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
     parser.add_argument("--use_state_norm", type=bool, default=False, help="Trick 2:state normalization")
-    parser.add_argument("--use_reward_scaling", type=bool, default=True, help="Trick 4:reward scaling")
+    parser.add_argument("--use_reward_scaling", type=bool, default=False, help="Trick 4:reward scaling")
     parser.add_argument("--entropy_coef", type=float, default=0.01, help="Trick 5: policy entropy")
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Trick 6:learning rate Decay")
     parser.add_argument("--use_grad_clip", type=bool, default=True, help="Trick 7: Gradient clip")
     parser.add_argument("--use_orthogonal_init", type=bool, default=True, help="Trick 8: orthogonal initialization")
     parser.add_argument("--set_adam_eps", type=float, default=True, help="Trick 9: set Adam epsilon=1e-5")
     parser.add_argument("--use_tanh", type=float, default=False, help="Trick 10: tanh activation function")
-    parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU") # Priority for GRU
+    parser.add_argument("--use_gru", type=bool, default=False, help="Whether to use GRU") # Priority for GRU
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=False, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=5, type=str) # seed
-    parser.add_argument('--load_seed', default=1, type=str) # seed
+    parser.add_argument('--save_seed', default=4, type=str) # seed
+    parser.add_argument('--load_seed', default=3, type=str) # seed
     parser.add_argument('--c_tau',  default=0.8, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=180, type=int) # 最大仿真步数
+    parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=448, type=int) # BEV_Height
     parser.add_argument('--W', default=112, type=int) # BEV_Width

@@ -59,7 +59,7 @@ class Actor_Critic_RNN(nn.Module):
 
         # critic_init
         self.critic_rnn_hidden = None
-        self.critic_fc11 = nn.Linear(args.state_dim+args.action_dim, args.hidden_dim1)
+        self.critic_fc11 = nn.Linear(args.state_dim+(args.agent_num-1)*args.action_dim, args.hidden_dim1)
         self.critic_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
         if args.use_gru:
             self.critic_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
@@ -77,7 +77,7 @@ class Actor_Critic_RNN(nn.Module):
         elif args.use_lstm:
             self.OM_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         self.OM_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
-        self.OMmean_layer = nn.Linear(args.hidden_dim2, args.agent_num*args.action_dim)
+        self.OMmean_layer = nn.Linear(args.hidden_dim2, (args.agent_num-1)*args.action_dim)
         # self.OMstd_layer = nn.Linear(args.hidden_dim2, args.action_dim)
 
         if args.use_orthogonal_init:
@@ -216,7 +216,7 @@ class PPO_RNN:
             a_logprob = dist.log_prob(a)  # The log probability density of the action
         return a.cpu().numpy().flatten(), a_logprob.cpu().numpy().flatten(), p.cpu()
 
-    def get_value(self, s, p, _):
+    def get_value(self, s, p):
         self.ac.eval()
         with torch.no_grad():
             p = np.ascontiguousarray(p)
@@ -247,9 +247,9 @@ class PPO_RNN:
                 OM_buffer = replay_buffer.copy()
                 OM_buffer.pop(j)
                 if j == 0:
-                    batch = OM_buffer[j].get_training_data(max_episode_len,OM_buffer)
+                    batch = replay_buffer[j].get_training_data(max_episode_len,OM_buffer)
                 else:
-                    batch2 = OM_buffer[j].get_training_data(max_episode_len,OM_buffer)  # Get training data
+                    batch2 = replay_buffer[j].get_training_data(max_episode_len,OM_buffer)  # Get training data
                     for key in batch:
                         batch[key] = torch.cat([batch[key],batch2[key]],0)
                 batch_size = self.args.agent_num * self.batch_size
