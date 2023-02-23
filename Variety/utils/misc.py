@@ -16,6 +16,7 @@ import os
 import psutil
 import carla
 
+
 def draw_waypoints(world, waypoints, z=0.5):
     """
     Draw a list of waypoints at a certain height given in z.
@@ -192,6 +193,33 @@ def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None):
     rot = np.array(yaw-YAW)
     return loc, vec, rot
 
+def SDV_to_inertial(veh,x=None,y=None,vx=None,vy=None,yaw=None):
+    """
+    Transform a point from the local coordinate system to the global one
+
+        :param X,Y,VX,VY,YAW: local coordinates
+    """
+    veh_trans = veh.get_transform()
+    X = veh_trans.location.x
+    Y = veh_trans.location.y
+    YAW = veh_trans.rotation.yaw * np.pi/180
+    VX = veh.get_velocity().x
+    VY = veh.get_velocity().y
+    
+    # Compute the rotation matrix
+    R_reverse = np.array([[math.cos(YAW), -math.sin(YAW)], [math.sin(YAW), math.cos(YAW)]])
+    
+    # Compute the transformation
+    T = np.array([x, y])
+    
+    S = np.array([vx, vy])
+    
+    # Compute the transformed point
+    loc = np.dot(R_reverse, T) + np.array([X,Y])
+    vec = np.dot(R_reverse, S) + np.array([VX,VY])
+    rot = np.array(yaw+YAW)
+    return loc, vec, rot
+
 def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None,accx=None, accy=None):
     X = route.location.x
     Y = route.location.y
@@ -274,3 +302,4 @@ def closest_wp_idx(ego_state, fpath, f_idx, w_size=10):
             closest_wp_index = i
             min_dist = temp_dist
     return f_idx + closest_wp_index
+

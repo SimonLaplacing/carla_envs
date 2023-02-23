@@ -131,9 +131,8 @@ class Create_Envs(object):
         # ego序列设置--------------------------------------------------------------------
         self.ego_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        self.ego_transform.location += carla.Location(x=-25,y=-3.5)
         for i in range(self.agent_num-1):
-            self.ego_transform.location += carla.Location(x=10,y=0)
+            self.ego_transform.location += carla.Location(x=-35,y=-13.5)
             ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
             # print(npc_bp.get_attribute('color').recommended_values)
             ego_bp.set_attribute('color', '229,28,0')
@@ -157,27 +156,21 @@ class Create_Envs(object):
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        for i in range(28): #28
+        for i in range(27): #28
             if i == 0:
-                obsta_bp = self.blueprint_library.find(id='vehicle.mercedes-benz.coupe')
-                obstacle_transform.location += carla.Location(x=40,y=0.3) #40,0.3
-                obstacle = self.world.try_spawn_actor(obsta_bp, obstacle_transform)
-                obstacle_transform.location += carla.Location(x=50,y=-5.3)
-                if obstacle is None:
-                    print('%s obstacle created failed' % i)
-                else:
-                    self.obstacle_list.append(obstacle)
-                    # print('created %s' % obstacle.type_id)
+                obstacle_transform.location += carla.Location(x=95,y=3.8) #40,0.3
+                obstacle_transform.location += carla.Location(x=0,y=-5.8)
+
             else:
                 obsta_bp = self.blueprint_library.find(id='static.prop.streetbarrier')
-                obstacle_transform.location += carla.Location(x=-3.5,y=7.8)
+                obstacle_transform.location += carla.Location(x=-3.5,y=4.4)
                 obstacle1 = self.world.try_spawn_actor(obsta_bp, obstacle_transform)
                 self.obstacle_list.append(obstacle1)
-                obstacle_transform.location += carla.Location(y=-7.8)
+                obstacle_transform.location += carla.Location(y=-4.4)
                 obstacle2 = self.world.try_spawn_actor(obsta_bp, obstacle_transform)
                 self.obstacle_list.append(obstacle2)
-                self.ob_loc.append([self.obstacle_list[i].get_location().x, self.obstacle_list[i].get_location().y, 
-                                self.obstacle_list[i].get_location().z])
+                self.ob_loc.append([self.obstacle_list[0].get_location().x, self.obstacle_list[0].get_location().y, 
+                                self.obstacle_list[0].get_location().z])
 
 
         # 传感器设置-------------------------------------------------------------------
@@ -186,7 +179,7 @@ class Create_Envs(object):
             self.sensor_list[i] = collision
         
         # 车辆初始参数
-        target_speed = [carla.Vector3D(16.5,0,0),carla.Vector3D(20,0,0),carla.Vector3D(20,0,0),carla.Vector3D(20,0,0),carla.Vector3D(20,0,0),carla.Vector3D(20,0,0)] # 16.5-20
+        target_speed = [carla.Vector3D(20,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0)] # 16.5-20
         for i in range(self.agent_num):
             self.ego_list[i].set_target_velocity(target_speed[i])
 
@@ -269,7 +262,7 @@ class Create_Envs(object):
         control = list(np.zeros(self.agent_num,dtype=int))
         for i in range(self.agent_num):
             if self.args.control_mode == 0:
-                a,b,c,d = 1,1,0.5,-0.08
+                a,b,c,d = 0.5,0.4,0.2,-0.08
                 # x1,y1,speed1,x2,y2 = 0,0,0,0,0
                 x1,y1,speed1,x2,y2 = action[i]
                 speed1 = c * speed1 + d + misc.get_speed(self.ego_list[i]) # more acceleration
@@ -313,7 +306,7 @@ class Create_Envs(object):
                 move,steer = action[i]
                 # npc_move,npc_steer = npc_action
 
-                steer = self.args.fixed_delta_seconds*(180/540)*steer + (1-self.args.c_tau)*self.ego_list[i].get_control().steer
+                steer = self.args.fixed_delta_seconds*(180/540)*steer + self.ego_list[i].get_control().steer
                 # npc_steer = self.args.c_tau*npc_steer + (1-self.args.c_tau)*self.npc_list[0].get_control().steer
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
@@ -350,16 +343,15 @@ class Create_Envs(object):
                     move,steer = 0,0
                 move = np.clip((move + control[i].throttle - control[i].brake),-1,1)
                 steer = np.clip((steer + control[i].steer),-1,1)
-                steer = self.args.c_tau*steer + (1-self.args.c_tau)*self.ego_list[0].get_control().steer
+                steer = self.args.c_tau*steer + (1-self.args.c_tau)*self.ego_list[i].get_control().steer
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
                     control[i] = carla.VehicleControl(throttle = throttle, steer = steer, brake = 0)
                 elif move < 0:
                     brake = -self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().brake
                     control[i] = carla.VehicleControl(throttle = 0, steer = steer, brake = brake)
-
-        for i in range(self.agent_num):
-            self.ego_list[i].apply_control(control[i])
+        # for i in range(self.agent_num):
+        self.ego_list[0].apply_control(control[0])
         # self.npc_list[0].apply_control(npc_control)
 
         # print('ego:%f,%f,%f,npc:%f,%f,%f'%(self.ego_list[0].get_control().throttle,self.ego_list[0].get_control().steer,self.ego_list[0].get_control().brake,
@@ -374,7 +366,7 @@ class Create_Envs(object):
             path = []
             path_bonus = 0
             if self.args.Start_Path:            
-                if step == 0:                
+                if step ==0:                
                     self.pathplanner[i] = self.update_route(self.route[i])
                     self.wps_to_go[i] = 0
                     self.path[i] = 0
@@ -483,6 +475,8 @@ class Create_Envs(object):
             # cv.imwrite(self.directory + '/save_1.png', ego_rgb)
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
+            # print(ego_BEV.shape)
+
             # npc_BEV = npc_rgb.swapaxes(0,2).swapaxes(1,2)
 
             # ego_BEV = self.sensor_list[0][1].get_BEV()
@@ -573,11 +567,11 @@ class Create_Envs(object):
             # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
-            reward = ((-100)*col[0] + (0.02)*(dis + ob) 
-            + (-10)*(target_disX/5)**2 + (-20)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            + 50*route_bonus - 50*timeout + 10*path_bonus
-            - 1*abs(acc[1]))
+            reward = ((-40)*col[0] 
+            + (-5)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            + 20*route_bonus - 50*timeout + 10*path_bonus
+            - 0.25*abs(acc[1]))
             # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
             # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
             # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 

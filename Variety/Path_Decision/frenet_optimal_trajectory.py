@@ -200,7 +200,7 @@ class FrenetPlanner:
         # Parameters
         self.MAX_SPEED = 150.0 / 3.6  # maximum speed [m/s]
         self.MAX_ACCEL = 6.0  # maximum acceleration [m/ss]  || Tesla model 3: 6.878
-        self.MAX_CURVATURE = 1.0  # maximum curvature [1/m]
+        self.MAX_CURVATURE = 2.0  # maximum curvature [1/m]
         self.LANE_WIDTH = float(self.args.carla_lane_width)
         self.MAXT = 6.0  # max prediction time [m]
         self.MINT = 3.0  # min prediction time [m]
@@ -764,9 +764,9 @@ class FrenetPlanner:
             elif any([abs(c) > self.MAX_CURVATURE for c in fplist[i].c]):  # Max curvature check
                 # print('cur')
                 continue
-            elif not self.check_collision(fplist[i], ob_list):
-                # print('col')
-                continue
+            # elif not self.check_collision(fplist[i], ob_list):
+            #     # print('col')
+            #     continue
 
             okind.append(i)
 

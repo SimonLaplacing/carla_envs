@@ -25,7 +25,7 @@ def euclidean_distance(v1, v2):
     return math.sqrt(sum([(a - b) ** 2 for a, b in zip(v1, v2)]))
 
 
-class VehiclePIDController:
+class VehiclePIDController2:
     """
     VehiclePIDController is the combination of two PID controllers (lateral and longitudinal) to perform the
     low level control a vehicle from client side
@@ -51,8 +51,8 @@ class VehiclePIDController:
             args_longitudinal = {'K_P': 40.0, 'K_D': 0.1, 'K_I': 4}
 
         self._vehicle = vehicle
-        self._lon_controller = PIDLongitudinalController(self._vehicle, **args_longitudinal, dt = self.args.fixed_delta_seconds)
-        self._lat_controller = PIDLateralController(self._vehicle, **args_lateral, dt = self.args.fixed_delta_seconds)
+        self._lon_controller = PIDLongitudinalController(self._vehicle, **args_longitudinal)
+        self._lat_controller = PIDLateralController(self._vehicle, **args_lateral)
 
     def reset(self):
         self._lon_controller.reset()

@@ -20,7 +20,7 @@ class ReplayBuffer:
 
     def reset_buffer(self):
         self.buffer = {'s': np.zeros([self.batch_size, self.episode_limit + 1, self.state_dim]),
-                       'p': np.zeros([self.batch_size, self.episode_limit + 1, self.args.hidden_dim1]),
+                       'p': np.zeros([self.batch_size, self.episode_limit + 1, 1000]),
                        'v': np.zeros([self.batch_size, self.episode_limit + 1]),
                        'a': np.zeros([self.batch_size, self.episode_limit,self.action_dim]),
                        'a_logprob': np.zeros([self.batch_size, self.episode_limit]),
@@ -31,7 +31,7 @@ class ReplayBuffer:
         self.episode_num = 0
         self.max_episode_len = 0
 
-    def store_transition(self, episode_step, s, p, v, a, a_logprob, r, dw):
+    def store_transition(self, episode_step, s, p, v, a, a_logprob, r, s_, p_, dw):
         self.buffer['s'][self.episode_num][episode_step] = s
         self.buffer['p'][self.episode_num][episode_step] = p
         self.buffer['v'][self.episode_num][episode_step] = v
@@ -64,7 +64,7 @@ class ReplayBuffer:
             # deltas.shape=(batch_size,max_episode_len)
             deltas = r + self.gamma * v_next * (1 - dw) - v
             for t in reversed(range(max_episode_len)):
-                gae = deltas[:, t] + self.gamma * self.lamda * gae  # gae.shape=(batch_size)
+                gae = deltas[:, t] + self.gamma * self.lamda * gae * (1 - dw[:, t]) # gae.shape=(batch_size)
                 adv[:, t] = gae
             v_target = adv + v  # v_target.shape(batch_size,max_episode_len)
             if self.use_adv_norm:  # Trick 1:advantage normalization
@@ -90,6 +90,11 @@ class ReplayBuffer:
                  'active': torch.tensor(self.buffer['active'][:, :max_episode_len], dtype=torch.float32),
                  'adv': torch.tensor(adv, dtype=torch.float32),
                  'v_target': torch.tensor(v_target, dtype=torch.float32)}
-        for j in range(1,self.args.agent_num-1):
-            batch['om_real_a'] = torch.cat([batch['om_real_a'],torch.tensor(OM_buffer[j].buffer['a'][:, :max_episode_len], dtype=torch.float32)],-1)
+        for j in range(1,self.args.max_agent_num-1):
+            padding_a = torch.zeros([self.batch_size, self.episode_limit,self.action_dim],dtype=torch.int)
+            if j < self.args.agent_num-1:
+                batch['om_real_a'] = torch.cat([batch['om_real_a'],torch.tensor(OM_buffer[j].buffer['a'][:, :max_episode_len], dtype=torch.float32)],-1)
+            elif j >= self.args.agent_num-1:
+                batch['om_real_a'] = torch.cat([batch['om_real_a'],padding_a[:, :max_episode_len]],-1)
+ 
         return batch
