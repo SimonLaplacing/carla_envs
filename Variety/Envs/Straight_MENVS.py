@@ -563,15 +563,15 @@ class Create_Envs(object):
             #     npc_finish = 0
 
             #simple reward
-            # ego_reward = (-1)*ego_col[0] + (-0.6)*timeout + 1*ego_bonus
+            reward = (-1)*col[0] + (-0.6)*timeout + 0.3*route_bonus
             # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
-            reward = ((-40)*col[0] 
-            + (-5)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            + 20*route_bonus - 50*timeout + 10*path_bonus
-            - 0.25*abs(acc[1]))
+            # reward = ((-80)*col[0] 
+            # + (-5)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            # + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            # + 40*route_bonus - 25*timeout + 10*path_bonus
+            # - 0.25*abs(acc[1]))
             # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
             # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
             # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 

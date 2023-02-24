@@ -56,7 +56,8 @@ class Actor_Critic_RNN(nn.Module):
             self.share_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         self.share_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
-        self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
+        # self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
+        self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim)
 
         # critic_init
         # self.critic_rnn_hidden = None
@@ -128,7 +129,8 @@ class Actor_Critic_RNN(nn.Module):
         if torch.isnan(mean).any():             
             print('error1:',mean)
         # print(std,std.shape)
-        dist = MultivariateNormal(mean, scale_tril=std)  # Get the Gaussian distribution, Using scale_tril will be more efficient
+        # dist = MultivariateNormal(mean, scale_tril=std)  # Get the Gaussian distribution, Using scale_tril will be more efficient
+        dist = MultivariateNormal(mean, covariance_matrix=std)
         return mean, std, dist
 
     def critic(self, s, p, om_a):

@@ -350,7 +350,7 @@ class Create_Envs(object):
                     move,steer = 0,0
                 move = np.clip((move + control[i].throttle - control[i].brake),-1,1)
                 steer = np.clip((steer + control[i].steer),-1,1)
-                steer = self.args.c_tau*steer + (1-self.args.c_tau)*self.ego_list[0].get_control().steer
+                steer = self.args.c_tau*steer + (1-self.args.c_tau)*self.ego_list[i].get_control().steer
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
                     control[i] = carla.VehicleControl(throttle = throttle, steer = steer, brake = 0)
@@ -569,15 +569,15 @@ class Create_Envs(object):
             #     npc_finish = 0
 
             #simple reward
-            # ego_reward = (-1)*ego_col[0] + (-0.6)*timeout + 1*ego_bonus
+            reward = (-1)*col[0] + (-0.6)*timeout + 0.3*route_bonus
             # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
-            reward = ((-100)*col[0] + (0.02)*(dis + ob) 
-            + (-10)*(target_disX/5)**2 + (-20)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            + 50*route_bonus - 50*timeout + 10*path_bonus
-            - 1*abs(acc[1]))
+            # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
+            # + (-10)*(target_disX/5)**2 + (-20)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            # + 50*route_bonus - 50*timeout + 10*path_bonus
+            # - 1*abs(acc[1]))
             # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
             # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
             # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 

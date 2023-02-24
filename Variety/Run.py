@@ -46,9 +46,14 @@ class Runner:
             from Traj_Decision.SAC.normalization import Normalization, RewardScaling
             from Traj_Decision.SAC.SAC import SAC as Model
             from Traj_Decision.SAC.SAC import ReplayBuffer
+        elif self.args.model == 'MADDPG':
+            from Traj_Decision.MADDPG.maddpg import MADDPG as Model
+            from Traj_Decision.MADDPG.buffer import ReplayBuffer
 
         self.directory = './carla-Variety/'
         self.save_directory = self.directory + '/' + self.args.mode + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.save_seed)
+        self.args.save_directory = self.save_directory
+
         # Create env
         if not misc.judgeprocess('CarlaUE4.exe'):
             os.startfile('D:\CARLA_0.9.11\WindowsNoEditor\CarlaUE4.exe')
@@ -213,10 +218,11 @@ class Runner:
                 
                 # npc_v = self.npc.get_value(npc_state, npc_BEV, ego_a)
                 # a_list[j] = ego_a
-            for j in range(self.agent_num):
-                om_list = a_list.copy()
-                om_list.pop(j)
-                v_list[j] = self.policy[j].get_value(data[j][0], data[j][-1], np.array(om_list).ravel())
+            if not self.args.model=='SAC': 
+                for j in range(self.agent_num):
+                    om_list = a_list.copy()
+                    om_list.pop(j)
+                    v_list[j] = self.policy[j].get_value(data[j][0], data[j][-1], np.array(om_list).ravel())
             self.create_envs.set_vehicle_control(a_list, step_list)
 
             #---------和环境交互动作反馈---------
@@ -290,12 +296,13 @@ class Runner:
             if self.args.use_state_norm:
                 last_state[j] = self.state_norm(last_state[j])
                 # npc_last_state = self.state_norm(npc_last_state)
-            v = self.policy[j].get_value(last_state[j],last_BEV[j],None)
-            # npc_v = self.npc.get_value(npc_last_state,npc_last_BEV, None)
-            self.buffer[j].store_last_sv(last_step[j] + 1, v, last_state[j], last_BEV[j])
-            # self.npc_buffer.store_last_sv(npc_last_step + 1, npc_v, npc_last_state, p)
+            if not self.args.model=='SAC':
+                v = self.policy[j].get_value(last_state[j],last_BEV[j],None)
+                # npc_v = self.npc.get_value(npc_last_state,npc_last_BEV, None)
+                self.buffer[j].store_last_sv(last_step[j] + 1, v, last_state[j], last_BEV[j])
+                # self.npc_buffer.store_last_sv(npc_last_step + 1, npc_v, npc_last_state, p)
 
-            self.writer.add_scalar('reward/'+str(j)+'_train_rewards', episode_reward[j]/(last_step[j] + 1), global_step=self.total_episode)
+            self.writer.add_scalar('reward/'+str(j)+'_train_rewards', episode_reward[j], global_step=self.total_episode)
             # self.writer.add_scalar('reward/npc_train_rewards', npc_episode_reward/(npc_last_step + 1), global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             # self.writer.add_scalar('step/npc_train_step', npc_final_step/(self.npc_num-3), global_step=self.total_episode)
@@ -412,7 +419,7 @@ class Runner:
             print("Episode: {} step: {}".format(self.total_episode, episode_step+1))
 
             for j in range(self.agent_num):
-                evaluate_reward[j] += (episode_reward[j]/(last_step[j] + 1))
+                evaluate_reward[j] += (episode_reward[j])
                 # npc_evaluate_reward += (npc_episode_reward/(npc_last_step + 1))
                 total_offsetx[j] += (offsetx[j]/(last_step[j] + 1))
                 # npc_total_offsetx += (npc_offsetx/(npc_last_step + 1))
@@ -464,7 +471,7 @@ class Runner:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting")
-    parser.add_argument("--evaluate_freq", type=float, default=64, help="Evaluate the policy every 'evaluate_freq' steps")
+    parser.add_argument("--evaluate_freq", type=float, default=16, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--save_freq", type=int, default=200, help="Save frequency")
     parser.add_argument("--evaluate_times", type=float, default=1, help="Evaluate times")
 
@@ -473,16 +480,16 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=256, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=32, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.1, help="std_initialization")
+    parser.add_argument("--init_std", type=float, default=0.15, help="std_initialization")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=8, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=1, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=False, help="Trick 1:advantage normalization")
@@ -498,19 +505,19 @@ if __name__ == '__main__':
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=4, type=str) # seed
-    parser.add_argument('--load_seed', default=3, type=str) # seed
+    parser.add_argument('--save_seed', default=1, type=str) # seed
+    parser.add_argument('--load_seed', default=1, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=224, type=int) # BEV_Height
     parser.add_argument('--W', default=56, type=int) # BEV_Width
 
-    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
     parser.add_argument('--random', default=False, type=bool) # random-training
-    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--model', default='SAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
-    parser.add_argument('--max_agent_num', default=3, type=int) # 最大智能体个数
+    parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
     parser.add_argument('--pure_track', default=False, type=bool) # 纯跟踪/
     parser.add_argument('--control_mode', default=1, type=int) # /PID控制（优化点）：0/直接控制：1/混合控制（优化控制量）：2
