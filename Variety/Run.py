@@ -194,7 +194,7 @@ class Runner:
         a_list = list(np.zeros([self.args.max_agent_num,self.args.action_dim],dtype=int))
         v_list = list(np.zeros(self.agent_num,dtype=int))
         a_logprob = list(np.ones(self.agent_num,dtype=int))
-        p = list(np.ones(self.agent_num,dtype=int))
+        # p = list(np.ones(self.agent_num,dtype=int))
         last_step = list(np.ones(self.agent_num,dtype=int))
         episode_reward = list(np.ones(self.agent_num,dtype=int))
         final_step = list(np.ones(self.agent_num,dtype=int))

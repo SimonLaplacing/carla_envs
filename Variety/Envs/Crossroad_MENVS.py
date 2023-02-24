@@ -421,15 +421,15 @@ class Create_Envs(object):
             next_route = self.route[i][step_list[i] + 1]
             # npc_next_route = self.npc_route[npc_step + 1]
 
-            next_transform = self.ego_list[0].get_transform()
+            next_transform = self.ego_list[i].get_transform()
             # npc_next_transform = self.npc_list[0].get_transform()
             obstacle_next_transform = self.obstacle_list[0].get_transform()
             # 速度、加速度
-            velocity = self.ego_list[0].get_velocity()
+            velocity = self.ego_list[i].get_velocity()
             # npc_velocity = self.npc_list[0].get_velocity()
             yaw = next_transform.rotation.yaw * np.pi/180
             # npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
-            acc = self.ego_list[0].get_acceleration()
+            acc = self.ego_list[i].get_acceleration()
             # npc_acc = self.npc_list[0].get_acceleration()
             
 
@@ -465,7 +465,7 @@ class Create_Envs(object):
             ob_y = (obstacle_next_transform.location.y-next_transform.location.y)
             ob = np.sqrt(ob_x**2+ob_y**2)
 
-            ego_BEV_ = self.birdViewProducer.produce(agent_vehicle=self.ego_list[0])
+            ego_BEV_ = self.birdViewProducer.produce(agent_vehicle=self.ego_list[i])
             # npc_BEV_ = self.birdViewProducer.produce(agent_vehicle=self.npc_list[0])
             # ego_BEV = ego_BEV_.swapaxes(0,2).swapaxes(1,2)
             # ego_BEV = npc_BEV_.swapaxes(0,2).swapaxes(1,2)
@@ -488,7 +488,7 @@ class Create_Envs(object):
             for j in range(self.args.max_agent_num):
                 if j<self.agent_num and j != i:
                     opponent_transform = self.ego_list[j].get_transform()
-                    opponent_velocity = self.ego_list[0].get_velocity()
+                    opponent_velocity = self.ego_list[j].get_velocity()
                     opponent_yaw = opponent_transform.rotation.yaw * np.pi/180
                     ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw) 
                     next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.ego_list[j])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2)])
