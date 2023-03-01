@@ -188,7 +188,7 @@ class Runner:
             self.world.tick() # 客户端主导，tick
         else:
             self.world.wait_for_tick() # 服务器主导，tick
-        data = self.create_envs.get_vehicle_step(step_list, 0)
+        data,step_list = self.create_envs.get_vehicle_step(step_list, 0)
         last_state = list(np.ones(self.agent_num,dtype=int))
         last_BEV = list(np.ones(self.agent_num,dtype=int))
         a_list = list(np.zeros([self.args.max_agent_num,self.args.action_dim],dtype=int))
@@ -234,12 +234,12 @@ class Runner:
             else:
                 self.world.wait_for_tick() # 服务器主导，tick
             # self.data_queue.put(self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step))
-            data = self.create_envs.get_vehicle_step(step_list,episode_step)
+            data,step_list = self.create_envs.get_vehicle_step(step_list,episode_step)
 
             for j in range(self.agent_num):
                 data[j][-1] = self.BEV_handle.act(data[j][-1])
-                if data[j][0][0] > -0.1:
-                    step_list[j] += 1                    
+                # if data[j][0][0] > -0.1:
+                #     step_list[j] += 1                    
             # if npc_next_state[0] > -0.1:
             #     npc_step += 1
             
@@ -288,8 +288,12 @@ class Runner:
             # ego_BEV = ego_next_BEV
             # npc_BEV = npc_next_BEV
 
-            if any(dw): # 结束条件
-                break
+            if self.args.all_any == 'all':
+                if all(dw): # 结束条件
+                    break
+            else:
+                if any(dw):
+                    break 
 
         # An episode is over, store v in the last step
         for j in range(self.agent_num):
@@ -303,6 +307,7 @@ class Runner:
                 # self.npc_buffer.store_last_sv(npc_last_step + 1, npc_v, npc_last_state, p)
 
             self.writer.add_scalar('reward/'+str(j)+'_train_rewards', episode_reward[j], global_step=self.total_episode)
+            self.writer.add_scalar('reward/'+str(j)+'_total_train_rewards', episode_reward[j]/(last_step[j] + 1), global_step=self.total_episode)
             # self.writer.add_scalar('reward/npc_train_rewards', npc_episode_reward/(npc_last_step + 1), global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             # self.writer.add_scalar('step/npc_train_step', npc_final_step/(self.npc_num-3), global_step=self.total_episode)
@@ -334,10 +339,11 @@ class Runner:
         # npc_total_fin = 0
         # npc_total_col = 0
         dw = list(np.zeros(self.agent_num,dtype=int))
-        a_list = list(np.ones([self.agent_num,self.args.action_dim],dtype=int))
-        last_step = list(np.ones(self.agent_num,dtype=int))
-        episode_reward = list(np.ones(self.agent_num,dtype=int))
-        final_step = list(np.ones(self.agent_num,dtype=int))
+        a_list = list(np.zeros([self.agent_num,self.args.action_dim],dtype=int))
+        last_step = list(np.zeros(self.agent_num,dtype=int))
+        episode_reward = list(np.zeros(self.agent_num,dtype=int))
+        total_evaluate_reward = list(np.zeros(self.agent_num,dtype=int))
+        final_step = list(np.zeros(self.agent_num,dtype=int))
 
         for _ in range(self.args.evaluate_times):
             episode_reward = list(np.zeros(self.agent_num,dtype=int))
@@ -354,7 +360,7 @@ class Runner:
                     # print('frame:', ff)
             else:
                 self.world.wait_for_tick() # 服务器主导，tick
-            data = self.create_envs.get_vehicle_step(step_list, 0)
+            data,step_list = self.create_envs.get_vehicle_step(step_list, 0)
             
             for j in range(self.agent_num):
                 if self.args.use_gru or self.args.use_lstm:
@@ -379,11 +385,11 @@ class Runner:
                 else:
                     self.world.wait_for_tick() # 服务器主导，tick
                     # self.data_queue.put(self.create_envs.get_vehicle_step(ego_step,npc_step,episode_step))
-                data = self.create_envs.get_vehicle_step(step_list,episode_step)
+                data,step_list = self.create_envs.get_vehicle_step(step_list,episode_step)
 
                 for j in range(self.agent_num):
-                    if data[j][0][0] > -0.1:
-                        step_list[j] += 1
+                    # if data[j][0][0] > -0.1:
+                    #     step_list[j] += 1
                     # if npc_next_state[0] > -0.1:
                     #     npc_step += 1
                     if data[j][3]:
@@ -414,12 +420,17 @@ class Runner:
                     # ego_BEV = data[j][-1]
                     # npc_BEV = npc_next_BEV
 
-                if any(dw): # 结束条件
-                    break
+                if self.args.all_any == 'all':
+                    if all(dw): # 结束条件
+                        break
+                else:
+                    if any(dw):
+                        break 
             print("Episode: {} step: {}".format(self.total_episode, episode_step+1))
 
             for j in range(self.agent_num):
-                evaluate_reward[j] += (episode_reward[j])
+                evaluate_reward[j] += (episode_reward[j]/(last_step[j] + 1))
+                total_evaluate_reward[j] += (episode_reward[j])
                 # npc_evaluate_reward += (npc_episode_reward/(npc_last_step + 1))
                 total_offsetx[j] += (offsetx[j]/(last_step[j] + 1))
                 # npc_total_offsetx += (npc_offsetx/(npc_last_step + 1))
@@ -432,6 +443,7 @@ class Runner:
             evaluate_step += (episode_step+1)
 
         evaluate_reward = [a/self.args.evaluate_times for a in evaluate_reward]
+        total_evaluate_reward = [a/self.args.evaluate_times for a in total_evaluate_reward]
         # npc_evaluate_reward /= self.args.evaluate_times
         total_offsetx = [a/self.args.evaluate_times for a in total_offsetx]
         # npc_total_offsetx /= self.args.evaluate_times
@@ -445,6 +457,7 @@ class Runner:
 
         for j in range(self.agent_num):
             self.writer.add_scalar('reward/'+str(j)+'_evaluate_rewards', evaluate_reward[j], global_step=self.total_episode)
+            self.writer.add_scalar('reward/'+str(j)+'_total_evaluate_rewards', total_evaluate_reward[j], global_step=self.total_episode)
             # self.writer.add_scalar('reward/npc_evaluate_rewards', npc_evaluate_reward, global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             # self.writer.add_scalar('step/npc_step', npc_final_step/(self.npc_num-3), global_step=self.total_episode)
@@ -480,19 +493,19 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=256, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=64, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--hidden_dim2", type=int, default=32, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.15, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
+    parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--init_std", type=float, default=0.2, help="std_initialization")
+    parser.add_argument("--lr", type=float, default=4e-4, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=1, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=5, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
-    parser.add_argument("--use_adv_norm", type=bool, default=False, help="Trick 1:advantage normalization")
+    parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
     parser.add_argument("--use_state_norm", type=bool, default=False, help="Trick 2:state normalization")
     parser.add_argument("--use_reward_scaling", type=bool, default=False, help="Trick 4:reward scaling")
     parser.add_argument("--entropy_coef", type=float, default=0.01, help="Trick 5: policy entropy")
@@ -505,17 +518,18 @@ if __name__ == '__main__':
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=1, type=str) # seed
+    parser.add_argument('--save_seed', default=2, type=str) # seed
     parser.add_argument('--load_seed', default=1, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
+    parser.add_argument('--max_length_of_trajectory', default=350, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=224, type=int) # BEV_Height
     parser.add_argument('--W', default=56, type=int) # BEV_Width
+    parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
     parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
     parser.add_argument('--random', default=False, type=bool) # random-training
-    parser.add_argument('--model', default='SAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
@@ -523,8 +537,9 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default=1, type=int) # /PID控制（优化点）：0/直接控制：1/混合控制（优化控制量）：2
     parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
     parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
-    parser.add_argument('--fixed_delta_seconds', default=0.03, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
+    parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
     parser.add_argument('--max_episode', default=5000, type=int) # 仿真次数
+    parser.add_argument('--all_any', default='any', type=str) # 仿真次数
     args = parser.parse_args()
 
     runner = Runner(args)

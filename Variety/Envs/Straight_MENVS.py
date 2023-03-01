@@ -156,9 +156,9 @@ class Create_Envs(object):
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        for i in range(27): #28
+        for i in range(2): #28
             if i == 0:
-                obstacle_transform.location += carla.Location(x=95,y=3.8) #40,0.3
+                obstacle_transform.location += carla.Location(x=295,y=3.8) #95,3.8
                 obstacle_transform.location += carla.Location(x=0,y=-5.8)
 
             else:
@@ -384,9 +384,9 @@ class Create_Envs(object):
                             for j in range((len(fp_list[k].t))):
                                 loc = carla.Location(x=fp_list[k].x[j], y=fp_list[k].y[j])
                                 if k==best_ind:
-                                    self.world.debug.draw_point(location = loc, color = carla.Color(255,0,0), size = 0.07, life_time = 5)
-                                # else:
-                                #     self.world.debug.draw_point(location = loc, size = 0.07, life_time = 5)
+                                    self.world.debug.draw_point(location = loc, color = carla.Color(255,0,0), size = 0.1, life_time = 8)
+                                else:
+                                    self.world.debug.draw_point(location = loc, size = 0.1, life_time = 8)
                         self.f_idx[i] = 1
                 
             # if self.npc_f_idx >= self.npc_wps_to_go:                

@@ -166,7 +166,7 @@ def positive(num):
     return num if num > 0.0 else 0.0
 
 # 大地转自车坐标系
-def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None):
+def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None,accx=None, accy=None):
     """
     Transform a point from the global coordinate system to the local one
 
@@ -178,20 +178,28 @@ def inertial_to_SDV(veh,x=None,y=None,vx=None,vy=None,yaw=None):
     YAW = veh_trans.rotation.yaw * np.pi/180
     VX = veh.get_velocity().x
     VY = veh.get_velocity().y
+    AX = veh.get_acceleration().x
+    AY = veh.get_acceleration().y
 
     # Compute the rotation matrix
     R = np.array([[math.cos(YAW), math.sin(YAW)], [-math.sin(YAW), math.cos(YAW)]])
 
     # Compute the transformation
-    T = np.array([x-X, y-Y])
+    T = np.array([x-X, y-Y]) if x is not None else None
 
-    S = np.array([vx-VX, vy-VY])
+    S = np.array([vx-VX, vy-VY]) if vx is not None else None
+
+    A = np.array([accx-AX, accy-AY]) if accx is not None else None
     
     # Compute the transformed point
-    loc = np.dot(R, T)
-    vec = np.dot(R, S)
-    rot = np.array(yaw-YAW)
-    return loc, vec, rot
+    loc = np.dot(R, T) if x is not None else None
+    vec = np.dot(R, S) if vx is not None else None
+    rot = np.array(yaw-YAW) if yaw is not None else None
+    acc = np.dot(R, A) if accx is not None else None
+    if accx == None:
+        return loc, vec, rot
+    else:
+        return loc, vec, rot, acc
 
 def SDV_to_inertial(veh,x=None,y=None,vx=None,vy=None,yaw=None):
     """
@@ -220,7 +228,7 @@ def SDV_to_inertial(veh,x=None,y=None,vx=None,vy=None,yaw=None):
     rot = np.array(yaw+YAW)
     return loc, vec, rot
 
-def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None,accx=None, accy=None):
+def inertial_to_frenet(route,x=None,y=None,vx=None,vy=None,yaw=None,accx=None,accy=None):
     X = route.location.x
     Y = route.location.y
     YAW = route.rotation.yaw * np.pi/180
