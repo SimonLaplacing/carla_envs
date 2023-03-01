@@ -222,21 +222,12 @@ class Create_Envs(object):
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
             self.ego_num[i] = len(self.route[i])
 
-        # npc_start_location = self.npc_transform.location
-        # npc_end_location = self.npc_transform.location + carla.Location(x=138)
-        # self.ego_route[1] = self.route_positions_generate(npc_start_location,npc_end_location)
-        # self.npc_num = len(self.npc_route[1])
         return self.route, self.ego_num
     
     def update_route(self,route):
         pathplanner = PathPlanner(self.args)
-        # self.npc_pathplanner = PathPlanner(self.args)
         pathplanner.start(route)
-        # self.npc_pathplanner.start(route)
         pathplanner.reset()
-        # self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
-        # self.path = list(np.zeros(self.agent_num,dtype=int))
-        # self.f_idx = list(np.zeros(self.agent_num,dtype=int)) 
         return pathplanner
 
     def generate_path(self,vehicle,pathplanner,f_idx):
@@ -265,9 +256,7 @@ class Create_Envs(object):
         for i in range((len(path.t))):
             position = [path.x[i],path.y[i]]
             positions.append(position)
-        # for i in range((len(self.npc_path.t))):
-        #     position = [self.npc_path[i].x,self.npc_path[i].y]
-        #     ego_positions.append(position)
+
         return positions, wps_to_go, fp, fplist, best_path_idx
 
     # 车辆控制
@@ -314,7 +303,8 @@ class Create_Envs(object):
 
             elif self.args.control_mode == 1:
                 move,steer = action[i]
-                steer = self.args.fixed_delta_seconds*(180/540)*steer + (1-self.args.c_tau)*self.ego_list[i].get_control().steer
+                steer = self.args.fixed_delta_seconds*(180/540)*steer + self.ego_list[i].get_control().steer
+                steer = np.clip(steer, -1, 1)
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
                     control[i] = carla.VehicleControl(throttle = throttle, steer = steer, brake = 0)
@@ -503,18 +493,8 @@ class Create_Envs(object):
                 col_num = 0
                 finish = 0
 
-            # if npc_step >= self.npc_num - 3:
-            #     npccol_num = 0
-            #     npc_finish = 1
-            # elif npc_col[0]==1 or npc_path==0: # npc结束条件npc_done
-            #     npccol_num = 1
-            #     npc_finish = 0
-            # else:
-            #     npccol_num = 0
-            #     npc_finish = 0
-
             #simple reward
-            reward = (-1)*col[0] + (-0.6)*timeout + 0.3*route_bonus
+            reward = (-1)*col[0] + (-0.8)*timeout + 0.5*route_bonus
             # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
