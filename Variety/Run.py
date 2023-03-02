@@ -21,8 +21,8 @@ class Runner:
             import Envs.Highway_MENVS as ENVS
         elif self.args.envs == 'straight':
             import Envs.Straight_MENVS as ENVS
-        elif self.args.envs == 'onramp':
-            import Envs.OnRamp_MENVS as ENVS
+        elif self.args.envs == 'ramp':
+            import Envs.Ramp_MENVS as ENVS
         elif self.args.envs == 'roundabout':
             import Envs.Roundabout_MENVS as ENVS
         elif self.args.envs == 'tjunction':
@@ -134,6 +134,7 @@ class Runner:
                     # 全局路径
                     route, num = self.create_envs.get_route()
                     self.num = num
+                    print('route_num:   ',self.num)
                     # print('route_num:',ego_num,npc_num)
                     for j in range(self.agent_num):
                         if self.args.Start_Path:
@@ -306,8 +307,8 @@ class Runner:
                 self.buffer[j].store_last_sv(last_step[j] + 1, v, last_state[j], last_BEV[j])
                 # self.npc_buffer.store_last_sv(npc_last_step + 1, npc_v, npc_last_state, p)
 
-            self.writer.add_scalar('reward/'+str(j)+'_train_rewards', episode_reward[j], global_step=self.total_episode)
-            self.writer.add_scalar('reward/'+str(j)+'_total_train_rewards', episode_reward[j]/(last_step[j] + 1), global_step=self.total_episode)
+            self.writer.add_scalar('reward/'+str(j)+'_train_rewards', episode_reward[j]/(last_step[j] + 1), global_step=self.total_episode)
+            self.writer.add_scalar('reward/'+str(j)+'_total_train_rewards', episode_reward[j], global_step=self.total_episode)
             # self.writer.add_scalar('reward/npc_train_rewards', npc_episode_reward/(npc_last_step + 1), global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             # self.writer.add_scalar('step/npc_train_step', npc_final_step/(self.npc_num-3), global_step=self.total_episode)
@@ -495,20 +496,20 @@ if __name__ == '__main__':
 
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
-    parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--init_std", type=float, default=0.3, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=4e-4, help="Learning rate of actor")
+    parser.add_argument("--lr", type=float, default=8e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=5, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=8, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
     parser.add_argument("--use_state_norm", type=bool, default=False, help="Trick 2:state normalization")
     parser.add_argument("--use_reward_scaling", type=bool, default=False, help="Trick 4:reward scaling")
-    parser.add_argument("--entropy_coef", type=float, default=0.01, help="Trick 5: policy entropy")
+    parser.add_argument("--entropy_coef", type=float, default=0.015, help="Trick 5: policy entropy")
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Trick 6:learning rate Decay")
     parser.add_argument("--use_grad_clip", type=bool, default=False, help="Trick 7: Gradient clip")
     parser.add_argument("--use_orthogonal_init", type=bool, default=True, help="Trick 8: orthogonal initialization")
@@ -518,8 +519,8 @@ if __name__ == '__main__':
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=3, type=str) # seed
-    parser.add_argument('--load_seed', default=3, type=str) # seed
+    parser.add_argument('--save_seed', default=9, type=str) # seed
+    parser.add_argument('--load_seed', default=9, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
@@ -527,9 +528,9 @@ if __name__ == '__main__':
     parser.add_argument('--W', default=56, type=int) # BEV_Width
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
-    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
     parser.add_argument('--random', default=False, type=bool) # random-training
-    parser.add_argument('--model', default='SAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
@@ -539,7 +540,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
     parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
     parser.add_argument('--max_episode', default=5000, type=int) # 仿真次数
-    parser.add_argument('--all_any', default='any', type=str) # 仿真次数
+    parser.add_argument('--all_any', default='all', type=str) # 仿真次数
     args = parser.parse_args()
 
     runner = Runner(args)

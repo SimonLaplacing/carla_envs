@@ -58,10 +58,10 @@ class Create_Envs(object):
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
         # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=95, y=10, z=15.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        spec_transform.location += carla.Location(x=0,z=50)
-        spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
+        spec_transform = Transform(Location(x=95, y=10, z=65.281942), 
+                    Rotation(pitch=-90.000000, yaw=90.500910, roll=0.000000))
+        # spec_transform.location += carla.Location(x=0,z=50)
+        # spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
         spectator.set_transform(spec_transform)
 
         # npc设置--------------------------------------------------------------------

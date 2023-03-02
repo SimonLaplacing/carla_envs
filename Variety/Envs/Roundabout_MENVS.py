@@ -104,11 +104,11 @@ class Create_Envs(object):
         self.obstacle_list = []
         self.sensor_list = list(np.zeros(self.agent_num,dtype=int))
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        # ego车辆设置---------------------------------------------------------------
+        # ego1车辆设置---------------------------------------------------------------
         ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        self.ego_transform = Transform(Location(x=0, y=-22.650967, z=0.1), 
-                    Rotation(pitch=-0.348271, yaw=175, roll=-0.000000))
+        self.ego_transform = Transform(Location(x=-20.5, y=0, z=0.1), 
+                    Rotation(pitch=0,yaw=90, roll=-0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = self.world.spawn_actor(ego_bp, self.ego_transform)
         self.ego_list[0] = ego
@@ -123,70 +123,94 @@ class Create_Envs(object):
                                                 args_longitudinal=self.longitudinal_dict,
                                                 args=self.args)
         print('created %s' % ego.type_id)
-
-        # 视角设置------------------------------------------------------------------
-        spectator = self.world.get_spectator()
-        # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=30, y=-4.350967, z=0), 
-                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
-        spec_transform.location += carla.Location(x=-35,z=60)
-        spec_transform.rotation = carla.Rotation(pitch=-90,yaw=0,roll=-0.000000)
-        spectator.set_transform(spec_transform)
-
-        # ego序列设置--------------------------------------------------------------------
-        self.ego_transform = Transform(Location(x=30, y=-22.350967, z=0.1), 
-                    Rotation(pitch=-0.348271, yaw=0, roll=-0.000000))
-        for i in range(self.agent_num-1):
-            self.ego_transform.location += carla.Location(x=-31,y=3)
-            self.ego_transform.rotation = carla.Rotation(pitch=-0.348271,yaw=175, roll=-0.000000)
+        
+        if self.agent_num >=2:
+            # ego2车辆设置---------------------------------------------------------------
             ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
-            # print(npc_bp.get_attribute('color').recommended_values)
-            ego_bp.set_attribute('color', '229,28,0')
-            ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
-            if ego is None:
-                print('%s npc created failed' % i)
-            else:
-                self.ego_list[i+1] = ego
+            # 坐标建立
+            self.ego_transform = Transform(Location(x=0, y=-19.6, z=0.1), 
+                        Rotation(pitch=0,yaw=180, roll=-0.000000))
+            ego_bp.set_attribute('color', '229,128,0')
+            # 车辆从蓝图定义以及坐标生成
+            ego = self.world.spawn_actor(ego_bp, self.ego_transform)
+            self.ego_list[1] = ego
+            if self.args.controller == 1:
+                self.controller[1] = VehiclePIDController(self.ego_list[1],
+                                                        args_lateral=self.lateral_dict2,
+                                                        args_longitudinal=self.longitudinal_dict
+                                                        )  
+            elif self.args.controller == 2:
+                self.controller[1] = VehiclePIDController2(self.ego_list[1],
+                                                    args_lateral=self.lateral_dict2,
+                                                    args_longitudinal=self.longitudinal_dict,
+                                                    args=self.args)
+            print('created %s' % ego.type_id)
+
+            if self.agent_num>=3:
+                # ego3车辆设置---------------------------------------------------------------
+                ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
+                # 坐标建立
+                self.ego_transform = Transform(Location(x=0, y=20.5, z=0.1), 
+                            Rotation(pitch=0,yaw=0, roll=-0.000000))
+                ego_bp.set_attribute('color', '229,28,0')
+                # 车辆从蓝图定义以及坐标生成
+                ego = self.world.spawn_actor(ego_bp, self.ego_transform)
+                self.ego_list[2] = ego
                 if self.args.controller == 1:
-                    self.controller[i+1] = VehiclePIDController(self.ego_list[i+1],
-                                                            args_lateral=self.lateral_dict1,
+                    self.controller[2] = VehiclePIDController(self.ego_list[2],
+                                                            args_lateral=self.lateral_dict2,
                                                             args_longitudinal=self.longitudinal_dict
                                                             )  
                 elif self.args.controller == 2:
-                    self.controller[i+1] = VehiclePIDController2(self.ego_list[i+1],
-                                                        args_lateral=self.lateral_dict1,
-                                                        args_longitudinal=self.longitudinal_dict
-                                                        )
+                    self.controller[2] = VehiclePIDController2(self.ego_list[2],
+                                                        args_lateral=self.lateral_dict2,
+                                                        args_longitudinal=self.longitudinal_dict,
+                                                        args=self.args)
                 print('created %s' % ego.type_id)
+
+        # 视角设置------------------------------------------------------------------
+        spectator = self.world.get_spectator()
+        spec_transform = Transform(Location(x=0, y=0, z=60), 
+                    Rotation(pitch=-90, yaw=0, roll=-0.000000))
+        spectator.set_transform(spec_transform)
 
         # 障碍物设置------------------------------------------------------------------
         obsta_bp = self.blueprint_library.find(id='static.prop.streetbarrier')
         #障碍物1
-        obstacle_transform1 =Transform(Location(x=30, y=-4.350967, z=0), 
-                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
-        obstacle_transform1.location += carla.Location(x=14,y=1.8)
-        obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        for i in range(10):
+        obstacle_transform1 =Transform(Location(x=-23, y=-12, z=0), 
+                    Rotation(pitch=0, yaw=275, roll=-0.000000))
+        for i in range(13):
             obstacle1 = self.world.try_spawn_actor(obsta_bp, obstacle_transform1)
-            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.04)
+            obstacle_transform1.location += carla.Location(x=-0.05,y=2.5)
             self.obstacle_list.append(obstacle1)
         #障碍物2
-        obstacle_transform2 =Transform(Location(x=30, y=-4.350967, z=0), 
-                    Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
-        obstacle_transform2.location += carla.Location(x=-8.5,y=1.82)
-        obstacle_transform2.rotation = carla.Rotation(pitch=0, yaw=275, roll=0.000000)
-        # for i in range(4):
-        #     obstacle2 = self.world.try_spawn_actor(obsta_bp, obstacle_transform2)
-        #     obstacle_transform2.location += carla.Location(x=-0.1,y=2.5)
-        #     self.obstacle_list.append(obstacle2)
-        # obstacle_transform3 =Transform(Location(x=30, y=-4.350967, z=0), 
-        #             Rotation(pitch=-0.348271, yaw=180, roll=-0.000000))
-        # obstacle_transform3.location += carla.Location(x=-10,y=-22)
-        # obstacle_transform3.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        # for i in range(25):
-        #     obstacle3 = self.world.try_spawn_actor(obsta_bp, obstacle_transform3)
-        #     obstacle_transform3.location += carla.Location(x=-2.5)
-        #     self.obstacle_list.append(obstacle3)
+        obstacle_transform2 =Transform(Location(x=22, y=-10, z=0), 
+                    Rotation(pitch=0, yaw=275, roll=-0.000000))
+        for i in range(5):
+            obstacle2 = self.world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=0.05,y=2.5)
+            self.obstacle_list.append(obstacle2)
+        #障碍物3
+        obstacle_transform2 =Transform(Location(x=-8, y=-22, z=0), 
+                    Rotation(pitch=0, yaw=185, roll=-0.000000))
+        for i in range(4):
+            obstacle2 = self.world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=2.5,y=0.05)
+            self.obstacle_list.append(obstacle2)
+        #障碍物4
+        obstacle_transform2 =Transform(Location(x=-4, y=23, z=0), 
+                    Rotation(pitch=0, yaw=185, roll=-0.000000))
+        for i in range(8):
+            obstacle2 = self.world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=2.5,y=-0.05)
+            self.obstacle_list.append(obstacle2)
+        #障碍物5
+        obstacle_transform3 =Transform(Location(x=-6, y=-25, z=0), 
+                    Rotation(pitch=0, yaw=135, roll=0.000000))
+        for i in range(12):
+            obstacle3 = self.world.try_spawn_actor(obsta_bp, obstacle_transform3)
+            obstacle_transform3.location += carla.Location(x=-1.7,y=1.5)
+            self.obstacle_list.append(obstacle3)
         for i in range(1):
             self.ob_loc.append([self.obstacle_list[i].get_location().x, self.obstacle_list[i].get_location().y, 
                                 self.obstacle_list[i].get_location().z])

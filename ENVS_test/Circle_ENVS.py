@@ -85,18 +85,17 @@ class Create_Envs(object):
         # npc设置--------------------------------------------------------------------
         npc_transform = Transform(Location(x=19.2, y=0, z=0.1), 
                     Rotation(pitch=0,yaw=270, roll=-0.000000))
-        for i in range(1):
             # npc_transform.location += carla.Location(x=-11,y=6)
             # npc_transform.rotation = carla.Rotation(pitch=0.348271,yaw=275, roll=-0.000000)
-            npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
-            # print(npc_bp.get_attribute('color').recommended_values)
-            npc_bp.set_attribute('color', '229,28,0')
-            npc = world.try_spawn_actor(npc_bp, npc_transform)
-            if npc is None:
-                print('%s npc created failed' % i)
-            else:
-                npc_list.append(npc)
-                print('created %s' % npc.type_id)
+        npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # print(npc_bp.get_attribute('color').recommended_values)
+        npc_bp.set_attribute('color', '229,28,0')
+        npc = world.try_spawn_actor(npc_bp, npc_transform)
+        if npc is None:
+            print('%s npc created failed' % i)
+        else:
+            npc_list.append(npc)
+            print('created %s' % npc.type_id)
 
         # 障碍物设置------------------------------------------------------------------
         obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')

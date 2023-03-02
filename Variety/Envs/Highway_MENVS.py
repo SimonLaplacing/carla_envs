@@ -94,71 +94,104 @@ class Create_Envs(object):
         return self.world
 
     def Create_actors(self):
-        a=1
         self.ego_list = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_list = []
         self.obstacle_list = []
         self.sensor_list = list(np.zeros(self.agent_num,dtype=int))
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        # ego车辆设置---------------------------------------------------------------
+        # ego1车辆设置---------------------------------------------------------------
         ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
         self.ego_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        # 车辆从蓝图定义以及坐标生成
-        for i in range(a):
-            self.ego_transform.location += carla.Location(x=0,y=0)
-            ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
-            # print(npc_bp.get_attribute('color').recommended_values)
-            ego_bp.set_attribute('color', '229,28,0')
-            ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
-            self.ego_list[i] = ego
-            if self.args.controller == 1:
-                self.controller[i] = VehiclePIDController(self.ego_list[i],
-                                                        args_lateral=self.lateral_dict,
-                                                        args_longitudinal=self.longitudinal_dict
-                                                        )  
-            elif self.args.controller == 2:
-                self.controller[i] = VehiclePIDController2(self.ego_list[i],
+        # 车辆从蓝图定义以及坐标生成:
+        ego_bp.set_attribute('color', '229,28,0')
+        ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
+        self.ego_list[0] = ego
+        if self.args.controller == 1:
+            self.controller[0] = VehiclePIDController(self.ego_list[0],
                                                     args_lateral=self.lateral_dict,
-                                                    args_longitudinal=self.longitudinal_dict,
-                                                    args=self.args)
-            print('created %s' % ego.type_id)
+                                                    args_longitudinal=self.longitudinal_dict
+                                                    )  
+        elif self.args.controller == 2:
+            self.controller[0] = VehiclePIDController2(self.ego_list[0],
+                                                args_lateral=self.lateral_dict,
+                                                args_longitudinal=self.longitudinal_dict,
+                                                args=self.args)
+        print('created %s' % ego.type_id)
 
-        # 视角设置------------------------------------------------------------------
-        spectator = self.world.get_spectator()
-        # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=140.341522, y=-375.140472, z=15.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        spec_transform.location += carla.Location(x=60,z=45)
-        spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
-        spectator.set_transform(spec_transform)
-
-        # ego序列设置--------------------------------------------------------------------
-        self.ego_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        self.ego_transform.location += carla.Location(x=-30,y=-3.5)
-        for k in range(self.agent_num-a):
-            self.ego_transform.location += carla.Location(x=15,y=0)
+        if self.agent_num>=2:
+            # ego2序列设置--------------------------------------------------------------------
+            self.ego_transform = Transform(Location(x=145.341522, y=-375.140472, z=0.281942), 
+                        Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
             ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
-            # print(npc_bp.get_attribute('color').recommended_values)
-            # ego_bp.set_attribute('color', '229,28,0')
+            ego_bp.set_attribute('color', '29,128,120')
             ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
             if ego is None:
-                print('%s ego created failed' % k+a)
+                print('%s ego created failed' % 2)
             else:
-                self.ego_list[k+a] = ego
+                self.ego_list[1] = ego
                 if self.args.controller == 1:
-                    self.controller[k+a] = VehiclePIDController(self.ego_list[k+a],
+                    self.controller[1] = VehiclePIDController(self.ego_list[1],
                                                             args_lateral=self.lateral_dict,
                                                             args_longitudinal=self.longitudinal_dict
                                                             )  
                 elif self.args.controller == 2:
-                    self.controller[k+a] = VehiclePIDController2(self.ego_list[k+a],
+                    self.controller[1] = VehiclePIDController2(self.ego_list[1],
                                                         args_lateral=self.lateral_dict,
                                                         args_longitudinal=self.longitudinal_dict
                                                         )
                 print('created %s' % ego.type_id)
+                
+            if self.agent_num>=3:
+                # ego3序列设置--------------------------------------------------------------------
+                self.ego_transform = Transform(Location(x=128.341522, y=-375.140472, z=0.281942), 
+                            Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
+                ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
+                ego_bp.set_attribute('color', '129,128,0')
+                ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
+                if ego is None:
+                    print('%s ego created failed' % 3)
+                else:
+                    self.ego_list[2] = ego
+                    if self.args.controller == 1:
+                        self.controller[2] = VehiclePIDController(self.ego_list[2],
+                                                                args_lateral=self.lateral_dict,
+                                                                args_longitudinal=self.longitudinal_dict
+                                                                )  
+                    elif self.args.controller == 2:
+                        self.controller[2] = VehiclePIDController2(self.ego_list[2],
+                                                            args_lateral=self.lateral_dict,
+                                                            args_longitudinal=self.longitudinal_dict
+                                                            )
+                    print('created %s' % ego.type_id)
+
+                if self.agent_num>=4:
+                    # ego4车辆设置---------------------------------------------------------------
+                    ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
+                    # 坐标建立
+                    self.ego_transform = Transform(Location(x=140.341522, y=-371.640472, z=0.281942), 
+                                Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
+                    # 车辆从蓝图定义以及坐标生成
+                    ego_bp.set_attribute('color', '29,128,0')
+                    ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
+                    self.ego_list[3] = ego
+                    if self.args.controller == 1:
+                        self.controller[3] = VehiclePIDController(self.ego_list[3],
+                                                                args_lateral=self.lateral_dict,
+                                                                args_longitudinal=self.longitudinal_dict
+                                                                )  
+                    elif self.args.controller == 2:
+                        self.controller[3] = VehiclePIDController2(self.ego_list[3],
+                                                            args_lateral=self.lateral_dict,
+                                                            args_longitudinal=self.longitudinal_dict,
+                                                            args=self.args)
+                    print('created %s' % ego.type_id)
+        
+        # 视角设置------------------------------------------------------------------
+        spectator = self.world.get_spectator()
+        spec_transform = Transform(Location(x=200.341522, y=-375.140472, z=60.281942), 
+                    Rotation(pitch=-90.000000, yaw=90, roll=0.000000))
+        spectator.set_transform(spec_transform)
 
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
@@ -192,7 +225,7 @@ class Create_Envs(object):
             self.sensor_list[i] = collision
         
         # 车辆初始参数
-        target_speed = [carla.Vector3D(16.5,0,0),carla.Vector3D(20,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0),carla.Vector3D(0,0,0)] # 16.5-20
+        target_speed = [carla.Vector3D(16.5,0,0),carla.Vector3D(20,0,0),carla.Vector3D(20,0,0)] # 16.5-20
         for i in range(self.agent_num):
             self.ego_list[i].set_target_velocity(target_speed[i])
 
@@ -216,7 +249,7 @@ class Create_Envs(object):
     def get_route(self):
         # 全局路径
         start_location = list(np.zeros(self.agent_num,dtype=int))
-        delta = [carla.Location(x=138),carla.Location(x=138),carla.Location(x=138),carla.Location(x=138),carla.Location(x=138),carla.Location(x=138)]
+        delta = [carla.Location(x=138,y=-3.5),carla.Location(x=138),carla.Location(x=138)]
         for i in range(self.agent_num):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
