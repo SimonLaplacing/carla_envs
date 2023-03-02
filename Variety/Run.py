@@ -112,12 +112,24 @@ class Runner:
             flag = 0
             
             for i in range(self.args.max_episode):
-                if self.args.random:
-                    if self.args.envs == 'highway':
+                if self.args.random1:
+                    if self.args.envs == 'crossroad':
+                        import Envs.Crossroad_MENVS as ENVS
+                    elif self.args.envs == 'highway':
                         import Envs.Highway_MENVS as ENVS
-                    rnd = random.randint(2,3)
-                    self.args.agent_num = rnd
-                    if not rnd==self.agent_num:
+                    elif self.args.envs == 'straight':
+                        import Envs.Straight_MENVS as ENVS
+                    elif self.args.envs == 'ramp':
+                        import Envs.Ramp_MENVS as ENVS
+                    elif self.args.envs == 'roundabout':
+                        import Envs.Roundabout_MENVS as ENVS
+                    elif self.args.envs == 'tjunction':
+                        import Envs.Tjunction_MENVS as ENVS
+                    elif self.args.envs == 'circle':
+                        import Envs.Circle_MENVS as ENVS
+                    self.args.max_agent_num = self.create_envs.get_max_agent()
+                    self.args.agent_num = random.randint(2,self.args.max_agent_num)
+                    if not self.args.agent_num==self.agent_num:
                         flag = 1
                         self.create_envs = ENVS.Create_Envs(self.args,self.save_directory) # 设置仿真模式以及步长
                         self.world = self.create_envs.connection()
@@ -531,7 +543,8 @@ if __name__ == '__main__':
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
     parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
-    parser.add_argument('--random', default=False, type=bool) # random-training
+    parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
+    parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
     parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数

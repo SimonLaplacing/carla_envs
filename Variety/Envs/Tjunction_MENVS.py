@@ -2,6 +2,7 @@ from xml.etree.ElementTree import PI
 import numpy as np
 import math
 import time
+import random
 import carla
 from carla import Transform, Location, Rotation
 
@@ -104,12 +105,21 @@ class Create_Envs(object):
         self.obstacle_list = []
         self.sensor_list = list(np.zeros(self.agent_num,dtype=int))
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-
+        if self.args.random2:
+            deltaX = [random.uniform(-5, 5),random.uniform(-5, 5),random.uniform(-5, 5)]
+            deltaY = [random.uniform(-5, 5),random.uniform(-5, 5),random.uniform(-5, 5)]
+            deltaYaw = [random.uniform(-5, 5),random.uniform(-5, 5),random.uniform(-5, 5)]
+            deltaV = [random.uniform(-5, 5),random.uniform(-5, 5),random.uniform(-5, 5)]
+        else:
+            deltaX = [0,0,0]
+            deltaY = [0,0,0]
+            deltaYaw = [0,0,0]
+            deltaV = [0,0,0]
         # ego1车辆设置---------------------------------------------------------------
         ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        self.ego_transform = Transform(Location(x=240.3, y=83, z=0.2), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
+        self.ego_transform = Transform(Location(x=240.3+deltaX[0], y=83+deltaY[0], z=0.2), 
+                    Rotation(pitch=0, yaw=-90+deltaYaw[0], roll=-0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = self.world.spawn_actor(ego_bp, self.ego_transform)
         self.ego_list[0] = ego
@@ -126,8 +136,8 @@ class Create_Envs(object):
         print('created %s' % ego.type_id)
         if self.agent_num >=2:
             # ego2序列设置--------------------------------------------------------------------
-            self.ego_transform = Transform(Location(x=231, y=32, z=0.1), 
-                        Rotation(pitch=0, yaw=90, roll=-0.000000))
+            self.ego_transform = Transform(Location(x=231+deltaX[1], y=32+deltaY[1], z=0.1), 
+                        Rotation(pitch=0, yaw=90+deltaYaw[1], roll=-0.000000))
             for i in range(1):
                 ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
                 # print(npc_bp.get_attribute('color').recommended_values)
@@ -150,11 +160,10 @@ class Create_Envs(object):
                     print('created %s' % ego.type_id)
             if self.agent_num>=3:
                 # ego3序列设置--------------------------------------------------------------------
-                self.ego_transform = Transform(Location(x=218, y=58.1, z=0.1), 
-                            Rotation(pitch=0, yaw=180, roll=-0.000000))
+                self.ego_transform = Transform(Location(x=218+deltaX[2], y=58.1+deltaY[2], z=0.1), 
+                            Rotation(pitch=0, yaw=180+deltaYaw[2], roll=-0.000000))
                 for i in range(1):
                     ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
-                    # print(npc_bp.get_attribute('color').recommended_values)
                     ego_bp.set_attribute('color', '29,28,70')
                     ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
                     if ego is None:
@@ -213,7 +222,7 @@ class Create_Envs(object):
             self.sensor_list[i] = collision
         
         # 车辆初始参数
-        target_speed = [carla.Vector3D(-8,0,0),carla.Vector3D(-10,0,0),carla.Vector3D(0,0,0)] # 16.5-20
+        target_speed = [carla.Vector3D(-8+deltaV[0],0,0),carla.Vector3D(-10+deltaV[1],0,0),carla.Vector3D(-10+deltaV[2],0,0)] # 16.5-20
         for i in range(self.agent_num):
             self.ego_list[i].set_target_velocity(target_speed[i])
 
@@ -606,7 +615,7 @@ class Create_Envs(object):
         return state_space
     
     def get_max_agent(self):
-        return 4
+        return 3
 
     def clean(self):
         # 清洗环境
