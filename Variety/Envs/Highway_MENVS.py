@@ -556,6 +556,9 @@ class Create_Envs(object):
     def get_state_space(self):
         state_space = list(np.zeros(6*(self.args.max_agent_num+1),dtype=int))
         return state_space
+    
+    def get_max_agent(self):
+        return 4
 
     def clean(self):
         # 清洗环境

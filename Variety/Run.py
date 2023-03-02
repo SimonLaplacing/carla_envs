@@ -60,8 +60,10 @@ class Runner:
             time.sleep(15)
         self.create_envs = ENVS.Create_Envs(self.args,self.save_directory) # 设置仿真模式以及步长
         self.world = self.create_envs.connection()
+        self.args.max_agent_num = self.create_envs.get_max_agent()
         self.agent_num = self.args.agent_num # 根据场景创建agent_num个agent
-
+        if self.agent_num > self.args.max_agent_num:
+            raise Exception('Agent num is larger than max agent num')
         # Create a tensorboard
         self.writer = SummaryWriter(self.save_directory)
 
@@ -532,7 +534,7 @@ if __name__ == '__main__':
     parser.add_argument('--random', default=False, type=bool) # random-training
     parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
-    parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
+    # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
     parser.add_argument('--pure_track', default=False, type=bool) # 纯跟踪/
     parser.add_argument('--control_mode', default=1, type=int) # /PID控制（优化点）：0/直接控制：1/混合控制（优化控制量）：2
