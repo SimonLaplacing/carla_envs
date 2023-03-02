@@ -104,37 +104,29 @@ class Create_Envs(object):
         # 障碍物设置------------------------------------------------------------------
         obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
         # 障碍物1
-        obstacle_transform1 = Transform(Location(x=9, y=-110.350967,z=0), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform1.location += carla.Location(x=50,y=-21.5,z=3)
-        obstacle_transform1.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
-        for i in range(30):
+        obstacle_transform1 = Transform(Location(x=-110, y=30, z=0.1), 
+                    Rotation(pitch=0, yaw=0, roll=-0.000000))
+        for i in range(12):
             obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
-            obstacle_transform1.location += carla.Location(x=-2.5,y=-0.05,z=-0.1)
+            obstacle_transform1.location += carla.Location(x=-2.5)
             obstacle_list.append(obstacle1)
         # 障碍物2  
-        obstacle_transform2 = Transform(Location(x=9, y=-110.350967,z=0), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform2.location += carla.Location(x=-2.8,y=-18.5)
-        obstacle_transform2.rotation = carla.Rotation(pitch=0, yaw=0, roll=0.000000)
+        obstacle_transform2 = Transform(Location(x=-142.5, y=-30, z=0.1), 
+                    Rotation(pitch=0, yaw=0, roll=-0.000000))
         for i in range(7):
             obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
-            obstacle_transform2.location += carla.Location(x=-2.5)
+            obstacle_transform2.location += carla.Location(x=2.5)
             obstacle_list.append(obstacle2)
         # 障碍物3
-        obstacle_transform3 = Transform(Location(x=9, y=-110.350967,z=0), 
+        obstacle_transform3 = Transform(Location(x=-103, y=-9.5, z=0.1), 
                     Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform3.location += carla.Location(x=-1.65,y=-17.5)
-        obstacle_transform3.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
-        for i in range(10):
+        for i in range(5):
             obstacle3 = world.try_spawn_actor(obsta_bp, obstacle_transform3)
-            obstacle_transform3.location += carla.Location(x=0.006,y=2.5)
+            obstacle_transform3.location += carla.Location(y=2.5)
             obstacle_list.append(obstacle3)
         # 障碍物4
-        obstacle_transform4 = Transform(Location(x=9, y=-110.350967,z=0), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
-        obstacle_transform4.location += carla.Location(x=2.45,y=-15)
-        obstacle_transform4.rotation = carla.Rotation(pitch=0, yaw=90, roll=0.000000)
+        obstacle_transform4 = Transform(Location(x=-152, y=2, z=0.1), 
+                    Rotation(pitch=0, yaw=90, roll=-0.000000))
         for i in range(10):
             obstacle4 = world.try_spawn_actor(obsta_bp, obstacle_transform4)
             obstacle_transform4.location += carla.Location(y=2.5)
