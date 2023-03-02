@@ -493,11 +493,11 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=64, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.2, help="std_initialization")
+    parser.add_argument("--init_std", type=float, default=0.3, help="std_initialization")
     parser.add_argument("--lr", type=float, default=4e-4, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
@@ -518,18 +518,18 @@ if __name__ == '__main__':
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=2, type=str) # seed
-    parser.add_argument('--load_seed', default=1, type=str) # seed
+    parser.add_argument('--save_seed', default=3, type=str) # seed
+    parser.add_argument('--load_seed', default=3, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=350, type=int) # 最大仿真步数
+    parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=224, type=int) # BEV_Height
     parser.add_argument('--W', default=56, type=int) # BEV_Width
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
-    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,onramp,roundabout,tjunction,circle
     parser.add_argument('--random', default=False, type=bool) # random-training
-    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--model', default='SAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
