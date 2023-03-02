@@ -28,7 +28,7 @@ class Create_Envs(object):
         client.set_timeout(10.0)
 
         # 连接世界
-        world = client.load_world('Town03')
+        world = client.load_world('Town05')
         settings = world.get_settings()
         settings.synchronous_mode = self.synchronous_mode
         settings.no_rendering_mode = self.no_rendering_mode
@@ -47,8 +47,30 @@ class Create_Envs(object):
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        ego_transform = Transform(Location(x=9, y=-110.350967, z=0.1), 
+        ego_transform = Transform(Location(x=-121, y=25, z=0.1), 
                     Rotation(pitch=0, yaw=-90, roll=-0.000000))
+        # 车辆从蓝图定义以及坐标生成
+        ego = world.spawn_actor(ego_bp, ego_transform)
+        ego_list.append(ego)
+        print('created %s' % ego.type_id)
+
+        # ego车辆设置---------------------------------------------------------------
+        ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # 坐标建立
+        ego_transform = Transform(Location(x=-107.5, y=-0.8, z=0.1), 
+                    Rotation(pitch=0, yaw=-180, roll=-0.000000))
+        ego_bp.set_attribute('color', '229,128,0')
+        # 车辆从蓝图定义以及坐标生成
+        ego = world.spawn_actor(ego_bp, ego_transform)
+        ego_list.append(ego)
+        print('created %s' % ego.type_id)
+
+        # ego车辆设置---------------------------------------------------------------
+        ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # 坐标建立
+        ego_transform = Transform(Location(x=-147.5, y=2.8, z=0.1), 
+                    Rotation(pitch=0, yaw=0, roll=-0.000000))
+        ego_bp.set_attribute('color', '29,228,0')
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
         ego_list.append(ego)
@@ -57,18 +79,18 @@ class Create_Envs(object):
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
         # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=9, y=-115.350967, z=0), 
-                    Rotation(pitch=0, yaw=180, roll=-0.000000))
-        spec_transform.location += carla.Location(x=-5,z=60)
-        spec_transform.rotation = carla.Rotation(pitch=-90,yaw=1.9,roll=-0.000000)
+        spec_transform = Transform(Location(x=-125, y=0, z=60), 
+                    Rotation(pitch=-90, yaw=0, roll=-0.000000))
+        # spec_transform.location += carla.Location(x=-5,z=60)
+        # spec_transform.rotation = carla.Rotation(pitch=-90,yaw=1.9,roll=-0.000000)
         spectator.set_transform(spec_transform)
 
         # npc设置--------------------------------------------------------------------
-        npc_transform = Transform(Location(x=9, y=-110.350967, z=0.1), 
-                    Rotation(pitch=0, yaw=-90, roll=-0.000000))
+        npc_transform = Transform(Location(x=-128.5, y=-25, z=0.1), 
+                    Rotation(pitch=0, yaw=90, roll=-0.000000))
         for i in range(1):
-            npc_transform.location += carla.Location(x=-18,y=-20.4)
-            npc_transform.rotation = carla.Rotation(pitch=0,yaw=0, roll=-0.000000)
+            # npc_transform.location += carla.Location(x=-18,y=-20.4)
+            # npc_transform.rotation = carla.Rotation(pitch=0,yaw=0, roll=-0.000000)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             # print(npc_bp.get_attribute('color').recommended_values)
             npc_bp.set_attribute('color', '229,28,0')
@@ -215,7 +237,7 @@ class Create_Envs(object):
         return state_space
 
 def main():
-    create_envs = Create_Envs(True,False,0.03)
+    create_envs = Create_Envs()
     client, world, blueprint_library = create_envs.connection()
     try:
         ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)

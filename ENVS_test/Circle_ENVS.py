@@ -29,7 +29,7 @@ class Create_Envs(object):
         client.set_timeout(10.0)
 
         # 连接世界
-        world = client.load_world('Town04')
+        world = client.load_world('Town03')
         settings = world.get_settings()
         settings.synchronous_mode = self.synchronous_mode
         settings.no_rendering_mode = self.no_rendering_mode
@@ -48,27 +48,46 @@ class Create_Envs(object):
         # ego车辆设置---------------------------------------------------------------
         ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        ego_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
+        ego_transform = Transform(Location(x=-20.5, y=0, z=0.1), 
+                    Rotation(pitch=0,yaw=90, roll=-0.000000))
         # 车辆从蓝图定义以及坐标生成
         ego = world.spawn_actor(ego_bp, ego_transform)
         ego_list.append(ego)
         print('created %s' % ego.type_id)
 
+        ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # 坐标建立
+        ego_transform = Transform(Location(x=0, y=-19.6, z=0.1), 
+                    Rotation(pitch=0,yaw=180, roll=-0.000000))
+        ego_bp.set_attribute('color', '229,128,0')
+        # 车辆从蓝图定义以及坐标生成
+        ego = world.spawn_actor(ego_bp, ego_transform)
+        ego_list.append(ego)
+        print('created %s' % ego.type_id)
+
+        ego_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # 坐标建立
+        ego_transform = Transform(Location(x=0, y=20.5, z=0.1), 
+                    Rotation(pitch=0,yaw=0, roll=-0.000000))
+        ego_bp.set_attribute('color', '29,28,220')
+        # 车辆从蓝图定义以及坐标生成
+        ego = world.spawn_actor(ego_bp, ego_transform)
+        ego_list.append(ego)
+        print('created %s' % ego.type_id)
         # 视角设置------------------------------------------------------------------
         spectator = world.get_spectator()
-        # spec_transform = ego.get_transform()
-        spec_transform = Transform(Location(x=140.341522, y=-375.140472, z=15.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        spec_transform.location += carla.Location(x=60,z=45)
-        spec_transform.rotation = carla.Rotation(pitch=-90, yaw=90)
+        spec_transform = Transform(Location(x=0, y=0, z=50), 
+                    Rotation(pitch=-90, yaw=0, roll=-0.000000))
+        # spec_transform.location += carla.Location(x=-15,z=50)
+        # spec_transform.rotation = carla.Rotation(pitch=-90,yaw=0,roll=-0.000000)
         spectator.set_transform(spec_transform)
 
         # npc设置--------------------------------------------------------------------
-        npc_transform = Transform(Location(x=160.341522, y=-371.640472, z=0.281942), 
-                    Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
+        npc_transform = Transform(Location(x=19.2, y=0, z=0.1), 
+                    Rotation(pitch=0,yaw=270, roll=-0.000000))
         for i in range(1):
-            npc_transform.location += carla.Location(x=-35,y=-13.5)
+            # npc_transform.location += carla.Location(x=-11,y=6)
+            # npc_transform.rotation = carla.Rotation(pitch=0.348271,yaw=275, roll=-0.000000)
             npc_bp = blueprint_library.find(id='vehicle.lincoln.mkz2017')
             # print(npc_bp.get_attribute('color').recommended_values)
             npc_bp.set_attribute('color', '229,28,0')
@@ -80,26 +99,70 @@ class Create_Envs(object):
                 print('created %s' % npc.type_id)
 
         # 障碍物设置------------------------------------------------------------------
-        obstacle_transform = ego_transform
-        for i in range(27):
-            if i==0:                
-                obstacle_transform.location += carla.Location(x=95,y=3.8)
-                obstacle_transform.location += carla.Location(x=0,y=-5.8)
-            else:
-                obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
-                obstacle_transform.location += carla.Location(x=-3.5,y=4.2)
-                obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform)
-                obstacle_list.append(obstacle1)
-                obstacle_transform.location += carla.Location(y=-4.2)
-                obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform)
-                obstacle_list.append(obstacle2)
-
+        obsta_bp = blueprint_library.find(id='static.prop.streetbarrier')
+        #障碍物1
+        obstacle_transform1 =Transform(Location(x=-23, y=-8, z=0), 
+                    Rotation(pitch=0, yaw=275, roll=-0.000000))
+        for i in range(8):
+            obstacle1 = world.try_spawn_actor(obsta_bp, obstacle_transform1)
+            obstacle_transform1.location += carla.Location(x=-0.05,y=2.5)
+            obstacle_list.append(obstacle1)
+        #障碍物2
+        obstacle_transform2 =Transform(Location(x=22, y=-8, z=0), 
+                    Rotation(pitch=0, yaw=275, roll=-0.000000))
+        for i in range(8):
+            obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=0.05,y=2.5)
+            obstacle_list.append(obstacle2)
+        #障碍物2
+        obstacle_transform2 =Transform(Location(x=-8, y=-22, z=0), 
+                    Rotation(pitch=0, yaw=185, roll=-0.000000))
+        for i in range(7):
+            obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=2.5,y=0.05)
+            obstacle_list.append(obstacle2)
+        #障碍物2
+        obstacle_transform2 =Transform(Location(x=-8, y=23, z=0), 
+                    Rotation(pitch=0, yaw=185, roll=-0.000000))
+        for i in range(7):
+            obstacle2 = world.try_spawn_actor(obsta_bp, obstacle_transform2)
+            obstacle_transform2.location += carla.Location(x=2.5,y=-0.05)
+            obstacle_list.append(obstacle2)
+        #障碍物3
+        obstacle_transform3 =Transform(Location(x=-6, y=-25, z=0), 
+                    Rotation(pitch=0, yaw=135, roll=0.000000))
+        for i in range(10):
+            obstacle3 = world.try_spawn_actor(obsta_bp, obstacle_transform3)
+            obstacle_transform3.location += carla.Location(x=-1.7,y=1.5)
+            obstacle_list.append(obstacle3)
+        #障碍物4
+        obstacle_transform4 =Transform(Location(x=-6, y=25, z=0), 
+                    Rotation(pitch=0, yaw=45, roll=0.000000))
+        for i in range(10):
+            obstacle4 = world.try_spawn_actor(obsta_bp, obstacle_transform4)
+            obstacle_transform4.location += carla.Location(x=-1.7,y=-1.5)
+            obstacle_list.append(obstacle4)
+        #障碍物5
+        obstacle_transform5 =Transform(Location(x=6, y=25, z=0), 
+                    Rotation(pitch=0, yaw=135, roll=0.000000))
+        for i in range(10):
+            obstacle5 = world.try_spawn_actor(obsta_bp, obstacle_transform5)
+            obstacle_transform5.location += carla.Location(x=1.7,y=-1.5)
+            obstacle_list.append(obstacle5)
+        #障碍物6
+        obstacle_transform6 =Transform(Location(x=6, y=-24, z=0), 
+                    Rotation(pitch=0, yaw=45, roll=0.000000))
+        for i in range(10):
+            obstacle6 = world.try_spawn_actor(obsta_bp, obstacle_transform6)
+            obstacle_transform6.location += carla.Location(x=1.7,y=1.5)
+            obstacle_list.append(obstacle6)
         # 传感器设置-------------------------------------------------------------------
         ego_collision = SS.CollisionSensor(ego)
         npc_collision = SS.CollisionSensor(npc)
         ego_invasion = SS.LaneInvasionSensor(ego)
         npc_invasion = SS.LaneInvasionSensor(npc)
         sensor_list.extend([[ego_collision,ego_invasion],[npc_collision,npc_invasion]])
+
         return ego_list,npc_list,obstacle_list,sensor_list
 
     # 车辆控制
@@ -125,10 +188,10 @@ class Create_Envs(object):
                 ego_control = carla.VehicleControl(throttle = 0, steer = ego_steer, brake = ego_brake)
             if npc_move >= 0:
                 npc_throttle = c_tau*npc_move + (1-c_tau)*npc.get_control().throttle
-                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = 0, brake = 0)
+                npc_control = carla.VehicleControl(throttle = npc_throttle, steer = npc_steer, brake = 0)
             elif npc_move < 0:
                 npc_brake = -c_tau*npc_move + (1-c_tau)*npc.get_control().brake
-                npc_control = carla.VehicleControl(throttle = 0, steer = 0, brake = npc_brake)
+                npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = npc_brake)
             ego.apply_control(ego_control)
             npc.apply_control(npc_control)
 
@@ -139,19 +202,15 @@ class Create_Envs(object):
     def get_vehicle_step(self,ego,npc,ego_sensor,npc_sensor, step):
         ego_next_transform = ego.get_transform()
         npc_next_transform = npc.get_transform()
-        # ego_next_state = np.array([(ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90,
-        # (npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90])
-        # npc_next_state = np.array([(npc_next_transform.location.x-120)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90,
-        # (ego_next_transform.location.x-120)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90])
         # 速度、加速度
         ego_velocity = ego.get_velocity().x
         npc_velocity = npc.get_velocity().x
 
-        ego_next_state = np.array([(ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25, 
-            (npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25])
+        ego_next_state = np.array([(ego_next_transform.location.x+10)/50,(ego_next_transform.location.y+30)/40,ego_next_transform.rotation.yaw/360, ego_velocity/25, 
+            (npc_next_transform.location.x+10)/50,(npc_next_transform.location.y+30)/40,npc_next_transform.rotation.yaw/360, npc_velocity/25])
             
-        npc_next_state = np.array([(npc_next_transform.location.x-200)/125,(npc_next_transform.location.y+375)/4,npc_next_transform.rotation.yaw/90, npc_velocity/25, 
-            (ego_next_transform.location.x-200)/125,(ego_next_transform.location.y+375)/4,ego_next_transform.rotation.yaw/90, ego_velocity/25])
+        npc_next_state = np.array([(npc_next_transform.location.x+10)/50,(npc_next_transform.location.y+30)/40,npc_next_transform.rotation.yaw/360, npc_velocity/25, 
+            (ego_next_transform.location.x+10)/50,(ego_next_transform.location.y+30)/40,ego_next_transform.rotation.yaw/360, ego_velocity/25])
         
         ego_acceleration = abs(ego.get_acceleration().y)
         npc_acceleration = abs(npc.get_acceleration().y)
@@ -165,19 +224,17 @@ class Create_Envs(object):
         ev=-1 if ego_velocity <= 2 else 0
         nv=-1 if npc_velocity <= 2 else 0
 
-        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration + (5)*(ego_next_transform.location.x-200)/125 + ev + step/100
-        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration + (5)*(npc_next_transform.location.x-200)/125 + nv + step/100
-        # ego_reward = (-20)*ego_col[0] + eb
-        # npc_reward = (-20)*npc_col[0] + nb
+        ego_reward = (-10)*ego_col[0] + (0)*ego_acceleration - (5)*(ego_next_transform.location.x+10)/50 + ev + step/100
+        npc_reward = (-10)*npc_col[0] + (0)*npc_acceleration - (5)*(npc_next_transform.location.y+30)/40 + nv + step/100
         ego_sensor[1].reset()
         npc_sensor[1].reset()
 
         # done结束状态判断
-        if ego_col[0]==1 or ego_next_state[0] > 1: # ego结束条件ego_done
+        if ego_col[0]==1 or ego_next_state[0] < 0: # ego结束条件ego_done
             ego_done = True
         else:
             ego_done = False
-        if npc_col[0]==1 or npc_next_state[0] > 1: # npc结束条件npc_done
+        if npc_col[0]==1 or npc_next_state[1] < 0: # npc结束条件npc_done
             npc_done = True
         else:
             npc_done = False  
@@ -192,9 +249,9 @@ class Create_Envs(object):
     def get_state_space(self):
         state_space = [0,0,0,0,0,0,0,0] # ego_x,y,yaw,velocity;npc_x,y,yaw,velocity;
         return state_space
-    
+
 def main():
-    create_envs = Create_Envs(True,False,0.03)
+    create_envs = Create_Envs()
     client, world, blueprint_library = create_envs.connection()
     try:
         ego_list,npc_list,obstacle_list,sensor_list = create_envs.Create_actors(world,blueprint_library)
