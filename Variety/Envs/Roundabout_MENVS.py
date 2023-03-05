@@ -516,10 +516,13 @@ class Create_Envs(object):
                     opponent_transform = self.ego_list[j].get_transform()
                     opponent_velocity = self.ego_list[j].get_velocity()
                     opponent_yaw = opponent_transform.rotation.yaw * np.pi/180
-                    ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw) 
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.ego_list[j])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2)])
+                    if self.args.Frenet:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    else:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/4,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
-                    next_state.extend([1,1,0,0,0,0])
+                    next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
             # npc_target_disX = npc_f_loc[0]
             # npc_target_disY = npc_f_loc[1]
@@ -573,7 +576,7 @@ class Create_Envs(object):
             npc_score = 0
 
             # done结束状态判断
-            if step_list[i] >= self.ego_num[i] - 5:
+            if step_list[i] >= self.ego_num[i] - 8:
                 col_num = 0
                 finish = 1
             elif col[0]==1 or path==0: # ego结束条件ego_done
@@ -622,7 +625,7 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = list(np.zeros(6*(self.args.max_agent_num+1),dtype=int))
+        state_space = list(np.zeros(5*(self.args.max_agent_num+1),dtype=int))
         return state_space
     
     def get_max_agent(self):

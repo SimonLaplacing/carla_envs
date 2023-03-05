@@ -91,10 +91,10 @@ class Create_Envs(object):
         self.sensor_list = list(np.zeros(self.agent_num,dtype=int))
         self.controller = list(np.zeros(self.agent_num,dtype=int))
         if self.args.random2:
-            deltaX = [random.uniform(-5, 5),random.uniform(-5, 5)]
-            deltaY = [random.uniform(-5, 5),random.uniform(-5, 5)]
-            deltaYaw = [random.uniform(-5, 5),random.uniform(-5, 5)]
-            deltaV = [random.uniform(-5, 5),random.uniform(-5, 5)]
+            deltaX = [random.uniform(-4, 4),random.uniform(-4, 4)]
+            deltaY = [random.uniform(-0.001, 0.001),random.uniform(-0.001, 0.001)]
+            deltaYaw = [random.uniform(-0.001, 0.001),random.uniform(-0.001, 0.001)]
+            deltaV = [random.uniform(-8, 8),random.uniform(-8, 8)]
         else:
             deltaX = [0,0]
             deltaY = [0,0]
@@ -153,7 +153,7 @@ class Create_Envs(object):
         # 障碍物设置------------------------------------------------------------------
         obstacle_transform = Transform(Location(x=255.341522, y=-373.640472, z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910, roll=0.000000))
-        for i in range(35): #28
+        for i in range(28): #28
             obsta_bp = self.blueprint_library.find(id='static.prop.streetbarrier')
             obstacle_transform.location += carla.Location(x=-3.5,y=5)
             obstacle1 = self.world.try_spawn_actor(obsta_bp, obstacle_transform)
@@ -365,12 +365,13 @@ class Create_Envs(object):
                     self.f_idx[i] = misc.closest_wp_idx(location, self.path[i], self.f_idx[i])
                     path_bonus = self.f_idx[i] - self.last_idx[i]
                     self.last_idx[i] = self.f_idx[i]
-                
-            route = self.route[i][step_list[i]]
-            # npc_route = self.npc_route[npc_step]
-            # print('aaaaa: ',self.ego_num,step_list,i)
-            next_route = self.route[i][step_list[i] + 1]
-            # npc_next_route = self.npc_route[npc_step + 1]
+            try:
+                route = self.route[i][step_list[i]]
+                next_route = self.route[i][step_list[i] + 1]
+            except IndexError:
+                route = self.route[i][len(step_list[i])-1]
+                next_route = self.route[i][len(step_list[i])-1]
+
 
             next_transform = self.ego_list[i].get_transform()
             # npc_next_transform = self.npc_list[0].get_transform()
@@ -433,18 +434,21 @@ class Create_Envs(object):
             # ego_BEV = self.sensor_list[0][1].get_BEV()
             # npc_BEV = self.sensor_list[1][1].get_BEV()
 
-            next_state = [target_disX/5,target_disY/10,next_disX/10,next_disY/10,vec[0]/40,vec[1]/40,next_vec[0]/40,next_vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
+            next_state = [target_disX/5,target_disY/15,next_disX/10,next_disY/15,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
-            # ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2) # 外车6
+            # ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2) # 外车5
             for j in range(self.args.max_agent_num):
                 if j<self.agent_num and j != i:
                     opponent_transform = self.ego_list[j].get_transform()
                     opponent_velocity = self.ego_list[j].get_velocity()
                     opponent_yaw = opponent_transform.rotation.yaw * np.pi/180
-                    ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw) 
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.ego_list[j])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2)])
+                    if self.args.Frenet:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    else:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/15,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
-                    next_state.extend([1,1,0,0,0,0])
+                    next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
 
             # 碰撞、变道检测
@@ -481,10 +485,10 @@ class Create_Envs(object):
             npc_score = 0
 
             # done结束状态判断
-            if step_list[i] >= self.ego_num[i] - 5:
+            if step_list[i] >= self.ego_num[i] - 8:
                 col_num = 0
                 finish = 1
-            elif col[0]==1 or path==0: # ego结束条件ego_done
+            elif col[0]==1 or path==0:
                 col_num = 1
                 finish = 0
             else:
@@ -492,8 +496,7 @@ class Create_Envs(object):
                 finish = 0
 
             #simple reward
-            reward = (-1)*col[0] + (-0.8)*timeout + 0.5*route_bonus
-            # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
+            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
 
             #reward shaping
             # reward = ((-80)*col[0] 
@@ -501,11 +504,6 @@ class Create_Envs(object):
             # + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 40*route_bonus - 25*timeout + 10*path_bonus
             # - 0.25*abs(acc[1]))
-            # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
-            # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
-            # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
-            # + 50*npc_bonus - 50*timeout + 10*npc_path_bonus
-            # - 0.25*abs(npc_acc[1]))
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
         return data,step_list
 
@@ -519,7 +517,7 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = list(np.zeros(6*(self.args.max_agent_num+1),dtype=int))
+        state_space = list(np.zeros(5*self.args.max_agent_num+5,dtype=int))
         return state_space
     
     def get_max_agent(self):
@@ -534,9 +532,6 @@ class Create_Envs(object):
         for x in self.ego_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
-        # for x in self.npc_list:
-        #     # if x.is_alive:
-        #     self.client.apply_batch([carla.command.DestroyActor(x)])
         for x in self.obstacle_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
@@ -555,9 +550,6 @@ class Create_Envs(object):
         for x in self.ego_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
-        # for x in self.npc_list:
-        #     # if x.is_alive:
-        #     self.client.apply_batch([carla.command.DestroyActor(x)])
         for x in self.obstacle_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])

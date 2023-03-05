@@ -577,10 +577,13 @@ class Create_Envs(object):
                     opponent_transform = self.ego_list[j].get_transform()
                     opponent_velocity = self.ego_list[j].get_velocity()
                     opponent_yaw = opponent_transform.rotation.yaw * np.pi/180
-                    ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw) 
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.ego_list[j])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2)])
+                    if self.args.Frenet:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    else:
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
-                    next_state.extend([1,1,0,0,0,0])
+                    next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
             # npc_target_disX = npc_f_loc[0]
             # npc_target_disY = npc_f_loc[1]
@@ -655,15 +658,15 @@ class Create_Envs(object):
             #     npc_finish = 0
 
             #simple reward
-            # ego_reward = (-1)*ego_col[0] + (-0.6)*timeout + 1*ego_bonus
+            reward = (-1)*col[0] + (-0.6)*timeout + 0.1*route_bonus
             # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
-            reward = ((-40)*col[0] + (0.002)*(dis + ob) 
-            + (-5)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            + 10*route_bonus - 50*timeout + 10*path_bonus
-            - 0.25*abs(acc[1]))
+            # reward = ((-40)*col[0] + (0.002)*(dis + ob) 
+            # + (-5)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            # + (-2.5)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            # + 10*route_bonus - 50*timeout + 10*path_bonus
+            # - 0.25*abs(acc[1]))
             # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
             # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
             # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
@@ -682,7 +685,7 @@ class Create_Envs(object):
     
     # 车辆状态空间
     def get_state_space(self):
-        state_space = list(np.zeros(6*(self.args.max_agent_num+1),dtype=int))
+        state_space = list(np.zeros(5*(self.args.max_agent_num+1),dtype=int))
         return state_space
     
     def get_max_agent(self):

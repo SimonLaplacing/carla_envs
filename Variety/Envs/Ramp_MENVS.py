@@ -484,10 +484,10 @@ class Create_Envs(object):
                     if self.args.Frenet:
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
                     else:
-                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw) 
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.ego_list[j])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2)])
+                        ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/4,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
-                    next_state.extend([1,1,0,0,0,0])
+                    next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
 
             # 碰撞、变道检测
@@ -527,7 +527,7 @@ class Create_Envs(object):
             npc_score = 0
 
             # done结束状态判断
-            if step_list[i] >= self.ego_num[i] - 5:
+            if step_list[i] >= self.ego_num[i] - 8:
                 col_num = 0
                 finish = 1
             elif col[0]==1 or path==0: # ego结束条件ego_done

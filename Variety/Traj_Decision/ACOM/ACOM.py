@@ -326,7 +326,7 @@ class PPO_RNN:
                     # Update
                     self.optimizer.zero_grad()
                     loss = actor_loss + critic_loss + om_loss
-                    print('all kinds of loss:            ', actor_loss,critic_loss,om_loss,dist_entropy)
+                    print('all kinds of loss:            ', actor_loss,critic_loss,om_loss)
                     loss.backward()
                     if self.use_grad_clip:  # Trick 7: Gradient clip
                         torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 0.8)
