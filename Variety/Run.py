@@ -73,7 +73,6 @@ class Runner:
         self.args.state_dim = len(state_space)
         self.args.action_dim = len(action_space)
         self.args.episode_limit = self.args.max_length_of_trajectory # Maximum number of steps per episode
-        # self.ego_evaluate_rewards = []  # Record the rewards during the evaluating
 
         self.total_steps = 0
         self.total_episode = 0
@@ -84,7 +83,6 @@ class Runner:
         for i in range(self.args.max_agent_num):
             self.buffer[i] = ReplayBuffer(self.args)
             if self.args.shared_policy:
-                # self.ego = Model(self.args)
                 self.policy[i] = Model(self.args) if i == 0 else self.policy[i - 1]
             else:
                 self.policy[i] = Model(self.args)
@@ -147,7 +145,7 @@ class Runner:
                     route, num = self.create_envs.get_route()
                     self.num = num
                     print('route_num:   ',self.num)
-                    # print('route_num:',ego_num,npc_num)
+
                     for j in range(self.agent_num):
                         if self.args.Start_Path:
                             self.pp[j].start(route[j])                
@@ -182,6 +180,8 @@ class Runner:
             
             self.create_envs.Create_actors()
             self.evaluate_policy()
+        except KeyboardInterrupt:
+            self.create_envs.reset()
         finally:    
             self.create_envs.reset()
     # @profile(stream=open('memory_profile.log','w+'))
@@ -388,7 +388,7 @@ class Runner:
         for j in range(self.agent_num):
             self.writer.add_scalar('reward/'+str(j)+'_evaluate_rewards', evaluate_reward[j], global_step=self.total_episode)
             self.writer.add_scalar('reward/'+str(j)+'_total_evaluate_rewards', total_evaluate_reward[j], global_step=self.total_episode)
-            self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
+            self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-8), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsetx', total_offsetx[j], global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsety', total_offsety[j], global_step=self.total_episode)
             self.writer.add_scalar('rate/'+str(j)+'_col', total_col[j], global_step=self.total_episode)
@@ -419,12 +419,12 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=256, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--init_std", type=float, default=0.1, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate of actor")
+    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
@@ -444,8 +444,8 @@ if __name__ == '__main__':
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=15, type=str) # seed
-    parser.add_argument('--load_seed', default=15, type=str) # seed
+    parser.add_argument('--save_seed', default=16, type=str) # seed
+    parser.add_argument('--load_seed', default=16, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
@@ -455,8 +455,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
     parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
-    parser.add_argument('--random2', default=True, type=bool) # random-training for V,X,Y,YAW
-    parser.add_argument('--model', default='SAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
+    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
     parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2

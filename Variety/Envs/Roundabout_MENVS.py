@@ -440,17 +440,13 @@ class Create_Envs(object):
                     self.f_idx[i] = misc.closest_wp_idx(location, self.path[i], self.f_idx[i])
                     path_bonus = self.f_idx[i] - self.last_idx[i]
                     self.last_idx[i] = self.f_idx[i]
-
-                # if npc_path != 0:
-                #     self.npc_f_idx = misc.closest_wp_idx(npc_location, self.npc_path, self.npc_f_idx)
-                #     npc_path_bonus = self.npc_f_idx - self.npc_last_idx
-                #     self.npc_last_idx = self.npc_f_idx
                 
-            route = self.route[i][step_list[i]]
-            # npc_route = self.npc_route[npc_step]
-            # print('aaaaa: ',self.ego_num,step_list,i)
-            next_route = self.route[i][step_list[i] + 1]
-            # npc_next_route = self.npc_route[npc_step + 1]
+            try:
+                route = self.route[i][step_list[i]]
+                next_route = self.route[i][step_list[i] + 1]
+            except IndexError:
+                route = self.route[i][len(self.route[i])-1]
+                next_route = self.route[i][len(self.route[i])-1]
 
             next_transform = self.ego_list[i].get_transform()
             # npc_next_transform = self.npc_list[0].get_transform()

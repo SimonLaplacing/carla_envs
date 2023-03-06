@@ -275,7 +275,7 @@ class Create_Envs(object):
                     waypoint1=[i_loc1[0], i_loc1[1]]
                     waypoint2=[i_loc2[0], i_loc2[1]]
                     control[i] = self.controller[i].run_step_2_wp(speed1,waypoint1,waypoint2)
-                # npc_control = self.npc_controller.run_step(npc_speed,npc_waypoint)
+
             elif self.args.control_mode == 1:
                 move,steer = action[i]
                 steer = self.args.fixed_delta_seconds*(180/540)*steer + self.ego_list[i].get_control().steer
@@ -358,7 +358,6 @@ class Create_Envs(object):
 
         
             location = [self.ego_list[i].get_location().x, self.ego_list[i].get_location().y, math.radians(self.ego_list[i].get_transform().rotation.yaw)]
-            # npc_location = [npc.get_location().x, npc.get_location().y, math.radians(npc.get_transform().rotation.yaw)]
 
             if self.args.Start_Path:
                 if path!=0:
@@ -369,20 +368,15 @@ class Create_Envs(object):
                 route = self.route[i][step_list[i]]
                 next_route = self.route[i][step_list[i] + 1]
             except IndexError:
-                route = self.route[i][len(step_list[i])-1]
-                next_route = self.route[i][len(step_list[i])-1]
-
+                route = self.route[i][len(self.route[i])-1]
+                next_route = self.route[i][len(self.route[i])-1]
 
             next_transform = self.ego_list[i].get_transform()
-            # npc_next_transform = self.npc_list[0].get_transform()
             obstacle_next_transform = self.obstacle_list[0].get_transform()
             # 速度、加速度
             velocity = self.ego_list[i].get_velocity()
-            # npc_velocity = self.npc_list[0].get_velocity()
             yaw = next_transform.rotation.yaw * np.pi/180
-            # npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
             acc = self.ego_list[i].get_acceleration()
-            # npc_acc = self.npc_list[0].get_acceleration()
             
 
             if self.args.Frenet:
@@ -403,8 +397,6 @@ class Create_Envs(object):
 
             target_disX = f_loc[0]
             target_disY = f_loc[1]
-            # ego_npc_disX = ego_npc_loc[0]
-            # ego_npc_disY = ego_npc_loc[1]
             next_disX = next_loc[0]
             next_disY = next_loc[1]
 
@@ -428,11 +420,6 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
             # print(ego_BEV.shape)
-
-            # npc_BEV = npc_rgb.swapaxes(0,2).swapaxes(1,2)
-
-            # ego_BEV = self.sensor_list[0][1].get_BEV()
-            # npc_BEV = self.sensor_list[1][1].get_BEV()
 
             next_state = [target_disX/5,target_disY/15,next_disX/10,next_disY/15,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
@@ -476,13 +463,11 @@ class Create_Envs(object):
                     step_list[i] += 2  
 
             # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
-            
+                        
             # self.sensor_list[0][1].reset()
             # self.sensor_list[1][1].reset()
-            # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
-            ego_score = 0
-            npc_score = 0
+            # ego_score = 0
+            # npc_score = 0
 
             # done结束状态判断
             if step_list[i] >= self.ego_num[i] - 8:

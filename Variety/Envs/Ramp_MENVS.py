@@ -428,8 +428,12 @@ class Create_Envs(object):
                     path_bonus = self.f_idx[i] - self.last_idx[i]
                     self.last_idx[i] = self.f_idx[i]
                 
-            route = self.route[i][step_list[i]]
-            next_route = self.route[i][step_list[i] + 1]
+            try:
+                route = self.route[i][step_list[i]]
+                next_route = self.route[i][step_list[i] + 1]
+            except IndexError:
+                route = self.route[i][len(self.route[i])-1]
+                next_route = self.route[i][len(self.route[i])-1]
 
             next_transform = self.ego_list[i].get_transform()
             obstacle_next_transform = self.obstacle_list[0].get_transform()
