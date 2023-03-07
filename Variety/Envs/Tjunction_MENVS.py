@@ -236,8 +236,6 @@ class Create_Envs(object):
 
         positions = []
         for i in range((len(route))):
-            # xi = route[i][0].transform.location.x
-            # yi = route[i][0].transform.location.y
             position = route[i][0].transform
             positions.append(position)
         
@@ -251,22 +249,12 @@ class Create_Envs(object):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
             self.ego_num[i] = len(self.route[i])
-
-        # npc_start_location = self.npc_transform.location
-        # npc_end_location = self.npc_transform.location + carla.Location(x=138)
-        # self.ego_route[1] = self.route_positions_generate(npc_start_location,npc_end_location)
-        # self.npc_num = len(self.npc_route[1])
         return self.route, self.ego_num
     
     def update_route(self,route):
         pathplanner = PathPlanner(self.args)
-        # self.npc_pathplanner = PathPlanner(self.args)
         pathplanner.start(route)
-        # self.npc_pathplanner.start(route)
         pathplanner.reset()
-        # self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
-        # self.path = list(np.zeros(self.agent_num,dtype=int))
-        # self.f_idx = list(np.zeros(self.agent_num,dtype=int)) 
         return pathplanner
 
     def generate_path(self,vehicle,pathplanner,f_idx):
@@ -277,9 +265,7 @@ class Create_Envs(object):
         acc = math.sqrt(acc_vec.x ** 2 + acc_vec.y ** 2 + acc_vec.z ** 2)
         psi = math.radians(vehicle.get_transform().rotation.yaw)
         state = [vehicle.get_location().x, vehicle.get_location().y, speed, acc, psi, temp, self.args.carla_max_s]
-        # fpath = self.motionPlanner.run_step_single_path(state, self.f_idx, df_n=action[0], Tf=5, Vf_n=action[1])
-        fpath, fplist, best_path_idx = pathplanner.run_step(state, f_idx, None, self.ob_loc, target_speed=70/3.6)
-        # fpath, fplist, best_path_idx = self.pathplanner.run_step(state, self.f_idx, None, self.obstacle_list, target_speed=30/3.6)
+        fpath, fplist, best_path_idx = pathplanner.run_step(state, f_idx, None, self.ob_loc, target_speed=speed+0.01)
         wps_to_go = len(fpath.t) - 3 if fpath!=0 else 0   # -2 bc len gives # of items not the idx of last item + 2wp controller is used
         return fpath, fplist, best_path_idx, wps_to_go
 
@@ -295,9 +281,6 @@ class Create_Envs(object):
         for i in range((len(path.t))):
             position = [path.x[i],path.y[i]]
             positions.append(position)
-        # for i in range((len(self.npc_path.t))):
-        #     position = [self.npc_path[i].x,self.npc_path[i].y]
-        #     ego_positions.append(position)
         return positions, wps_to_go, fp, fplist, best_path_idx
 
     # 车辆控制
@@ -360,7 +343,6 @@ class Create_Envs(object):
                 else:
                     x1,y1 = self.route[i][step_list[i]].location.x,self.route[i][step_list[i]].location.y
                     x2,y2 = self.route[i][step_list[i]+2].location.x,self.route[i][step_list[i]+2].location.y
-                # speed1 = 5+math.sqrt(pow(x1-x2,2)+pow(y1-y2,2))/0.05
                 speed1 = misc.get_speed(self.ego_list[i])+1
                 waypoint1,waypoint2 = [x1,y1],[x2,y2]
                 waypoint = carla.Transform()
@@ -385,7 +367,6 @@ class Create_Envs(object):
 
         for i in range(self.agent_num):
             self.ego_list[i].apply_control(control[i])
-        # self.npc_list[0].apply_control(npc_control)
 
         # print('ego:%f,%f,%f,npc:%f,%f,%f'%(self.ego_list[0].get_control().throttle,self.ego_list[0].get_control().steer,self.ego_list[0].get_control().brake,
         #                                 self.npc_list[0].get_control().throttle,self.npc_list[0].get_control().steer,self.npc_list[0].get_control().brake))
@@ -422,18 +403,12 @@ class Create_Envs(object):
                                 #     self.world.debug.draw_point(location = loc, size = 0.07, life_time = 5)
                         self.f_idx[i] = 1
             location = [self.ego_list[i].get_location().x, self.ego_list[i].get_location().y, math.radians(self.ego_list[i].get_transform().rotation.yaw)]
-            # npc_location = [npc.get_location().x, npc.get_location().y, math.radians(npc.get_transform().rotation.yaw)]
 
             if self.args.Start_Path:
                 if path!=0:
                     self.f_idx[i] = misc.closest_wp_idx(location, self.path[i], self.f_idx[i])
                     path_bonus = self.f_idx[i] - self.last_idx[i]
                     self.last_idx[i] = self.f_idx[i]
-
-                # if npc_path != 0:
-                #     self.npc_f_idx = misc.closest_wp_idx(npc_location, self.npc_path, self.npc_f_idx)
-                #     npc_path_bonus = self.npc_f_idx - self.npc_last_idx
-                #     self.npc_last_idx = self.npc_f_idx
                 
             try:
                 route = self.route[i][step_list[i]]
@@ -514,29 +489,10 @@ class Create_Envs(object):
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
-            # npc_target_disX = npc_f_loc[0]
-            # npc_target_disY = npc_f_loc[1]
-            # npc_ego_disX = npc_ego_loc[0]
-            # npc_ego_disY = npc_ego_loc[1]
-            # npc_next_disX = npc_next_loc[0]
-            # npc_next_disY = npc_next_loc[1]
 
-            # npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
-            # npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
-            # npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-            # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
-            # npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-            # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
-
-            # npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/10,npc_vec[0]/40,npc_vec[1]/40,npc_next_vec[0]/40,npc_next_vec[1]/40,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),
-            # npc_ego_disX/40,npc_ego_disY/10,misc.get_speed(self.ego_list[0])/40,npc_ego_vec[0]/30,npc_ego_vec[1]/30,np.sin(npc_ego_yaw/2),
-            # npc_ob_loc[0]/30,npc_ob_loc[1]/25])
-            # print(ego_next_state,npc_next_state)
             # 碰撞、变道检测
             col = self.sensor_list[i].get_collision_history()
-            # npc_col = self.sensor_list[1][0].get_collision_history()
             # ego_inv = ego_sensor[1].get_invasion_history()
-            # npc_inv = npc_sensor[1].get_invasion_history()
             
 
             # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
@@ -557,16 +513,13 @@ class Create_Envs(object):
                     step_list[i] += 2  
 
             # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
-            
+             
             # self.sensor_list[0][1].reset()
-            # self.sensor_list[1][1].reset()
-            # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
             ego_score = 0
             npc_score = 0
 
             # done结束状态判断
-            if step_list[i] >= self.ego_num[i] - 8:
+            if step_list[i] >= self.ego_num[i] - 3:
                 col_num = 0
                 finish = 1
             elif col[0]==1 or path==0: # ego结束条件ego_done
@@ -596,12 +549,6 @@ class Create_Envs(object):
             # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 50*route_bonus - 50*timeout + 10*path_bonus
             # - 1*abs(acc[1]))
-            # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
-            # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
-            # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
-            # + 50*npc_bonus - 50*timeout + 10*npc_path_bonus
-            # - 0.25*abs(npc_acc[1]))
-            data[i] = [next_state,reward,col_num,finish,ego_BEV]
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
         return data,step_list
 
@@ -618,7 +565,8 @@ class Create_Envs(object):
         state_space = list(np.zeros(5*(self.args.max_agent_num+1),dtype=int))
         return state_space
     
-    def get_max_agent(self):
+    @staticmethod
+    def get_max_agent():
         return 3
 
     def clean(self):

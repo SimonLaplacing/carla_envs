@@ -197,7 +197,7 @@ class PPO_RNN:
         self.args = args
         self.batch_size = args.batch_size
         self.mini_batch_size = args.mini_batch_size
-        self.max_train_steps = args.max_length_of_trajectory * args.max_episode
+        self.max_train_steps = args.max_length_of_trajectory * args.max_episode/2
         self.lr = args.lr  # Learning rate of actor
         self.gamma = args.gamma  # Discount factor
         self.lamda = args.lamda  # GAE parameter

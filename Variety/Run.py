@@ -60,7 +60,7 @@ class Runner:
             time.sleep(15)
         self.create_envs = ENVS.Create_Envs(self.args,self.save_directory) # 设置仿真模式以及步长
         self.world = self.create_envs.connection()
-        self.args.max_agent_num = self.create_envs.get_max_agent()
+        self.args.max_agent_num = ENVS.Create_Envs(self.args,self.save_directory).get_max_agent()
         self.agent_num = self.args.agent_num # 根据场景创建agent_num个agent
         if self.agent_num > self.args.max_agent_num:
             raise Exception('Agent num is larger than max agent num')
@@ -105,10 +105,12 @@ class Runner:
                     
             evaluate_num = -1  # Record the number of evaluations
             save_num = 1
+            best_evaluate_reward = list(-99999*np.ones(self.agent_num,dtype=int))
             flag = 0
             
             for i in range(self.args.max_episode):
-                if self.args.random1:
+                if self.args.random0:
+                    self.args.envs = random.choice(['crossroad','highway','straight','ramp','roundabout','tjunction','circle'])
                     if self.args.envs == 'crossroad':
                         import Envs.Crossroad_MENVS as ENVS
                     elif self.args.envs == 'highway':
@@ -123,9 +125,10 @@ class Runner:
                         import Envs.Tjunction_MENVS as ENVS
                     elif self.args.envs == 'circle':
                         import Envs.Circle_MENVS as ENVS
-                    self.args.max_agent_num = self.create_envs.get_max_agent()
+                    self.args.max_agent_num = ENVS.Create_Envs(self.args,self.save_directory).get_max_agent()
+                if self.args.random1 or self.args.random0:
                     self.args.agent_num = random.randint(2,self.args.max_agent_num)
-                    if not self.args.agent_num==self.agent_num:
+                    if not self.args.agent_num==self.agent_num or self.args.random0:
                         flag = 1
                         self.create_envs = ENVS.Create_Envs(self.args,self.save_directory) # 设置仿真模式以及步长
                         self.world = self.create_envs.connection()
@@ -144,6 +147,7 @@ class Runner:
                     # 全局路径
                     route, num = self.create_envs.get_route()
                     self.num = num
+                    flag = 0
                     print('route_num:   ',self.num)
 
                     for j in range(self.agent_num):
@@ -152,8 +156,16 @@ class Runner:
                         misc.draw_waypoints(self.world,route[j])
 
                 if self.total_episode // self.args.evaluate_freq > evaluate_num:
-                    self.evaluate_policy()  # Evaluate the policy every 'evaluate_freq' steps
+                    total_evaluate_reward = self.evaluate_policy()  # Evaluate the policy every 'evaluate_freq' steps
                     evaluate_num += 1
+                    # Save the models
+                    # if self.total_episode // self.args.save_freq > save_num:
+                    for j in range(self.agent_num):
+                        if total_evaluate_reward[j] > best_evaluate_reward[j]:
+                            self.policy[j].save(self.save_directory + '/' + str(j))
+                            best_evaluate_reward[j] = total_evaluate_reward[j]
+                        # save_num += 1
+                        print('Network Saved')
                 
                 episode_steps = self.run_episode()  # Run an episode
                 self.total_steps += episode_steps
@@ -171,12 +183,7 @@ class Runner:
                             for j in range(self.args.max_agent_num):
                                 self.buffer[j].reset_buffer()
 
-                    # Save the models
-                    if self.total_episode // self.args.save_freq > save_num:
-                        for j in range(self.agent_num):
-                            self.policy[j].save(self.save_directory + '/' + str(j))
-                        save_num += 1
-                        print('Network Saved')
+                    
             
             self.create_envs.Create_actors()
             self.evaluate_policy()
@@ -283,7 +290,7 @@ class Runner:
             train_reward[j] = episode_reward[j]/(last_step[j] + 1)
             self.writer.add_scalar('reward/'+str(j)+'_train_rewards', train_reward[j], global_step=self.total_episode)
             self.writer.add_scalar('reward/'+str(j)+'_total_train_rewards', episode_reward[j], global_step=self.total_episode)
-            self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-8), global_step=self.total_episode)
+            self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_train_offsetx', offsetx[j]/(last_step[j] + 1), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_train_offsety', offsety[j]/(last_step[j] + 1), global_step=self.total_episode)
             self.writer.add_scalar('rate/'+str(j)+'_train_col', data[j][2], global_step=self.total_episode)
@@ -332,7 +339,6 @@ class Runner:
                 for j in range(self.agent_num):
                     if self.args.use_state_norm:
                         data[j][0] = self.state_norm(data[j][0], update=False)
-                        # npc_state = self.state_norm(npc_state, update=False)
                     # t1 = time.time()
                     data[j][-1] = self.BEV_handle.act(data[j][-1])
                     a_list[j], _ = self.policy[j].choose_action(data[j][0],data[j][-1], evaluate=True)
@@ -388,7 +394,7 @@ class Runner:
         for j in range(self.agent_num):
             self.writer.add_scalar('reward/'+str(j)+'_evaluate_rewards', evaluate_reward[j], global_step=self.total_episode)
             self.writer.add_scalar('reward/'+str(j)+'_total_evaluate_rewards', total_evaluate_reward[j], global_step=self.total_episode)
-            self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-8), global_step=self.total_episode)
+            self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsetx', total_offsetx[j], global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsety', total_offsety[j], global_step=self.total_episode)
             self.writer.add_scalar('rate/'+str(j)+'_col', total_col[j], global_step=self.total_episode)
@@ -406,6 +412,7 @@ class Runner:
                 # print('frame:', ff)
         else:
             self.world.wait_for_tick() # 服务器主导，tick
+        return total_evaluate_reward
 
 
 if __name__ == '__main__':
@@ -424,11 +431,11 @@ if __name__ == '__main__':
     parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--init_std", type=float, default=0.1, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=8, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=10, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
     parser.add_argument("--N", type=int, default=20, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
@@ -438,14 +445,14 @@ if __name__ == '__main__':
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Trick 6:learning rate Decay")
     parser.add_argument("--use_grad_clip", type=bool, default=False, help="Trick 7: Gradient clip")
     parser.add_argument("--use_orthogonal_init", type=bool, default=True, help="Trick 8: orthogonal initialization")
-    parser.add_argument("--set_adam_eps", type=float, default=False, help="Trick 9: set Adam epsilon=1e-5")
+    parser.add_argument("--set_adam_eps", type=float, default=True, help="Trick 9: set Adam epsilon=1e-5")
     parser.add_argument("--use_tanh", type=float, default=False, help="Trick 10: tanh activation function")
-    parser.add_argument("--use_gru", type=bool, default=False, help="Whether to use GRU") # Priority for GRU
+    parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU") # Priority for GRU
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=16, type=str) # seed
-    parser.add_argument('--load_seed', default=16, type=str) # seed
+    parser.add_argument('--save_seed', default=17, type=str) # seed
+    parser.add_argument('--load_seed', default=17, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=300, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
@@ -454,6 +461,7 @@ if __name__ == '__main__':
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
     parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
+    parser.add_argument('--random0', default=False, type=bool) # random-training for ENVS
     parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
     parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
     parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
@@ -465,7 +473,7 @@ if __name__ == '__main__':
     parser.add_argument('--synchronous_mode', default=True, type=bool) # 同步模式开关
     parser.add_argument('--no_rendering_mode', default=True, type=bool) # 无渲染模式开关
     parser.add_argument('--fixed_delta_seconds', default=0.05, type=float) # 步长,步长建议不大于0.1，为0时代表可变步长
-    parser.add_argument('--max_episode', default=10000, type=int) # 仿真次数
+    parser.add_argument('--max_episode', default=12000, type=int) # 仿真次数
     parser.add_argument('--all_any', default='all', type=str) # 仿真次数
     args = parser.parse_args()
 

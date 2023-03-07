@@ -35,29 +35,20 @@ class Create_Envs(object):
         self.client = None
         self.blueprint_library = None
         self.route = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_route = []
-        self.ego_num = list(999*np.ones(self.agent_num,dtype=int))
-        # self.npc_num            
+        self.ego_num = list(999*np.ones(self.agent_num,dtype=int))           
         self.c_tau = args.c_tau
         self.ego_transform = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_transform = 0
         self.birdViewProducer = None
         self.directory = directory
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_controller = None
         
         # PATH
         self.pathplanner = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_pathplanner = None
         self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_wps_to_go = 0
         self.path = list(np.zeros(self.agent_num,dtype=int))
         self.fp = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_path = 0
         self.f_idx = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_f_idx = 0
         self.last_idx = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_last_idx = 0
 
         # PID
         self._dt = 1.0 / 20.0
@@ -250,8 +241,6 @@ class Create_Envs(object):
 
         positions = []
         for i in range((len(route))):
-            # xi = route[i][0].transform.location.x
-            # yi = route[i][0].transform.location.y
             position = route[i][0].transform
             positions.append(position)
         
@@ -260,7 +249,7 @@ class Create_Envs(object):
     def get_route(self):
         # 全局路径
         start_location = list(np.zeros(self.agent_num,dtype=int))
-        delta = [carla.Location(x=138,y=-3.5),carla.Location(x=138),carla.Location(x=138)]
+        delta = [carla.Location(x=138,y=-3.5),carla.Location(x=95),carla.Location(x=95)]
         for i in range(self.agent_num):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
@@ -282,19 +271,18 @@ class Create_Envs(object):
         acc = math.sqrt(acc_vec.x ** 2 + acc_vec.y ** 2 + acc_vec.z ** 2)
         psi = math.radians(vehicle.get_transform().rotation.yaw)
         state = [vehicle.get_location().x, vehicle.get_location().y, speed, acc, psi, temp, self.args.carla_max_s]
-        # fpath = self.motionPlanner.run_step_single_path(state, self.f_idx, df_n=action[0], Tf=5, Vf_n=action[1])
-        fpath, fplist, best_path_idx = pathplanner.run_step(state, f_idx, None, self.ob_loc, target_speed=70/3.6)
-        # fpath, fplist, best_path_idx = self.pathplanner.run_step(state, self.f_idx, None, self.obstacle_list, target_speed=30/3.6)
+
+        fpath, fplist, best_path_idx = pathplanner.run_step(state, f_idx, None, self.ob_loc, target_speed=speed+0.01)
+
         wps_to_go = len(fpath.t) - 3 if fpath!=0 else 0   # -2 bc len gives # of items not the idx of last item + 2wp controller is used
         return fpath, fplist, best_path_idx, wps_to_go
 
     def get_path(self,vehicle,pathplanner,f_idx):
         #局部路径
-        # ego_fp, ego_fplist, ego_best_path_idx = self.generate_path('ego')
         fp, fplist, best_path_idx, wps_to_go = self.generate_path(vehicle,pathplanner,f_idx)
         path = fp
         positions = []
-        # npc_positions = []
+
         if fp == 0:
             return 0,0,0
         for i in range((len(path.t))):
@@ -432,8 +420,8 @@ class Create_Envs(object):
                 route = self.route[i][step_list[i]]
                 next_route = self.route[i][step_list[i] + 1]
             except IndexError:
-                route = self.route[i][len(self.route[i])-1]
-                next_route = self.route[i][len(self.route[i])-1]
+                route = self.route[i][self.ego_num[i]-1]
+                next_route = self.route[i][self.ego_num[i]-1]
 
             next_transform = self.ego_list[i].get_transform()
             obstacle_next_transform = self.obstacle_list[0].get_transform()
@@ -459,8 +447,7 @@ class Create_Envs(object):
             
             target_disX = f_loc[0]
             target_disY = f_loc[1]
-            # ego_npc_disX = ego_npc_loc[0]
-            # ego_npc_disY = ego_npc_loc[1]
+
             next_disX = next_loc[0]
             next_disY = next_loc[1]
 
@@ -496,9 +483,7 @@ class Create_Envs(object):
 
             # 碰撞、变道检测
             col = self.sensor_list[i].get_collision_history()
-            # npc_col = self.sensor_list[1][0].get_collision_history()
             # ego_inv = ego_sensor[1].get_invasion_history()
-            # npc_inv = npc_sensor[1].get_invasion_history()
             
 
             # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
@@ -522,16 +507,14 @@ class Create_Envs(object):
                 timeout = 1
 
             # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
-            
+             
             # self.sensor_list[0][1].reset()
-            # self.sensor_list[1][1].reset()
             # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
             ego_score = 0
             npc_score = 0
 
             # done结束状态判断
-            if step_list[i] >= self.ego_num[i] - 8:
+            if step_list[i] >= self.ego_num[i] - 3:
                 col_num = 0
                 finish = 1
             elif col[0]==1 or path==0: # ego结束条件ego_done
@@ -543,7 +526,6 @@ class Create_Envs(object):
 
             #simple reward
             reward = (-1)*col[0] + (-0.8)*timeout + 0.5*route_bonus
-            # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
 
             #reward shaping
             # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
@@ -551,11 +533,6 @@ class Create_Envs(object):
             # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 50*route_bonus - 50*timeout + 10*path_bonus
             # - 1*abs(acc[1]))
-            # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
-            # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
-            # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
-            # + 50*npc_bonus - 50*timeout + 10*npc_path_bonus
-            # - 0.25*abs(npc_acc[1]))
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
         return data,step_list
 
@@ -572,7 +549,8 @@ class Create_Envs(object):
         state_space = list(np.zeros(5*(self.args.max_agent_num+1),dtype=int))
         return state_space
     
-    def get_max_agent(self):
+    @staticmethod
+    def get_max_agent():
         return 4
 
     def clean(self):
@@ -584,9 +562,6 @@ class Create_Envs(object):
         for x in self.ego_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
-        # for x in self.npc_list:
-        #     # if x.is_alive:
-        #     self.client.apply_batch([carla.command.DestroyActor(x)])
         for x in self.obstacle_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
@@ -605,9 +580,6 @@ class Create_Envs(object):
         for x in self.ego_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
-        # for x in self.npc_list:
-        #     # if x.is_alive:
-        #     self.client.apply_batch([carla.command.DestroyActor(x)])
         for x in self.obstacle_list:
             # if x.is_alive:
             self.client.apply_batch([carla.command.DestroyActor(x)])
