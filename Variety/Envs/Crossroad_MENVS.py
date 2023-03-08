@@ -82,7 +82,7 @@ class Create_Envs(object):
         self.client.set_timeout(10.0)
 
         # 连接世界
-        self.world = self.client.load_world('Town03')
+        self.world = self.client.load_world('Town05')
         settings = self.world.get_settings()
         settings.synchronous_mode = self.synchronous_mode
         settings.no_rendering_mode = self.no_rendering_mode
@@ -248,7 +248,7 @@ class Create_Envs(object):
             self.sensor_list[i] = collision
         
         # 车辆初始参数
-        target_speed = [carla.Vector3D(0,-10+deltaV[0],0),carla.Vector3D(12+deltaV[1],0,0),carla.Vector3D(12+deltaV[2],0,0),carla.Vector3D(12+deltaV[3],0,0)]
+        target_speed = [carla.Vector3D(0,-8+deltaV[0],0),carla.Vector3D(-8+deltaV[1],0,0),carla.Vector3D(8+deltaV[2],0,0),carla.Vector3D(0,8+deltaV[3],0)]
         for i in range(self.agent_num):
             self.ego_list[i].set_target_velocity(target_speed[i])
 
@@ -262,8 +262,6 @@ class Create_Envs(object):
 
         positions = []
         for i in range((len(route))):
-            # xi = route[i][0].transform.location.x
-            # yi = route[i][0].transform.location.y
             position = route[i][0].transform
             positions.append(position)
         
@@ -272,27 +270,17 @@ class Create_Envs(object):
     def get_route(self):
         # 全局路径
         start_location = list(np.zeros(self.agent_num,dtype=int))
-        delta = [carla.Location(x=60,y=-23.5),carla.Location(x=75,y=0),carla.Location(x=75,y=0),carla.Location(x=75,y=0),carla.Location(x=75,y=0)]
+        delta = [carla.Location(x=60,y=-23.5),carla.Location(x=-75,y=0),carla.Location(x=23,y=-60),carla.Location(x=60,y=28)]
         for i in range(self.agent_num):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
             self.ego_num[i] = len(self.route[i])
-
-        # npc_start_location = self.npc_transform.location
-        # npc_end_location = self.npc_transform.location + carla.Location(x=138)
-        # self.ego_route[1] = self.route_positions_generate(npc_start_location,npc_end_location)
-        # self.npc_num = len(self.npc_route[1])
         return self.route, self.ego_num
     
     def update_route(self,route):
         pathplanner = PathPlanner(self.args)
-        # self.npc_pathplanner = PathPlanner(self.args)
         pathplanner.start(route)
-        # self.npc_pathplanner.start(route)
         pathplanner.reset()
-        # self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
-        # self.path = list(np.zeros(self.agent_num,dtype=int))
-        # self.f_idx = list(np.zeros(self.agent_num,dtype=int)) 
         return pathplanner
 
     def generate_path(self,vehicle,pathplanner,f_idx):
@@ -303,9 +291,7 @@ class Create_Envs(object):
         acc = math.sqrt(acc_vec.x ** 2 + acc_vec.y ** 2 + acc_vec.z ** 2)
         psi = math.radians(vehicle.get_transform().rotation.yaw)
         state = [vehicle.get_location().x, vehicle.get_location().y, speed, acc, psi, temp, self.args.carla_max_s]
-        # fpath = self.motionPlanner.run_step_single_path(state, self.f_idx, df_n=action[0], Tf=5, Vf_n=action[1])
         fpath, fplist, best_path_idx = pathplanner.run_step(state, f_idx, None, self.ob_loc, target_speed=speed+0.01)
-        # fpath, fplist, best_path_idx = self.pathplanner.run_step(state, self.f_idx, None, self.obstacle_list, target_speed=30/3.6)
         wps_to_go = len(fpath.t) - 3 if fpath!=0 else 0   # -2 bc len gives # of items not the idx of last item + 2wp controller is used
         return fpath, fplist, best_path_idx, wps_to_go
 
@@ -370,7 +356,7 @@ class Create_Envs(object):
                     control[i] = self.controller[i].run_step_2_wp(speed1,waypoint1,waypoint2)
             elif self.args.control_mode == 1:
                 move,steer = action[i]
-                steer = self.args.fixed_delta_seconds*(180/540)*steer + self.ego_list[i].get_control().steer
+                steer = self.args.fixed_delta_seconds*(180/486)*steer + self.ego_list[i].get_control().steer
                 steer = np.clip(steer, -1, 1)
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
@@ -526,7 +512,7 @@ class Create_Envs(object):
             # ego_BEV = self.sensor_list[0][1].get_BEV()
             # npc_BEV = self.sensor_list[1][1].get_BEV()
 
-            next_state = [target_disX/5,target_disY/10,next_disX/10,next_disY/10,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
+            next_state = [target_disX/5,target_disY/15,next_disX/10,next_disY/15,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
             # ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2) # 外车6
             for j in range(self.args.max_agent_num):
@@ -538,38 +524,17 @@ class Create_Envs(object):
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
                     else:
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/4,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/15,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
-            # npc_target_disX = npc_f_loc[0]
-            # npc_target_disY = npc_f_loc[1]
-            # npc_ego_disX = npc_ego_loc[0]
-            # npc_ego_disY = npc_ego_loc[1]
-            # npc_next_disX = npc_next_loc[0]
-            # npc_next_disY = npc_next_loc[1]
 
-            # npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
-            # npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
-            # npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-            # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
-            # npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-            # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
-
-            # npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/10,npc_vec[0]/40,npc_vec[1]/40,npc_next_vec[0]/40,npc_next_vec[1]/40,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),
-            # npc_ego_disX/40,npc_ego_disY/10,misc.get_speed(self.ego_list[0])/40,npc_ego_vec[0]/30,npc_ego_vec[1]/30,np.sin(npc_ego_yaw/2),
-            # npc_ob_loc[0]/30,npc_ob_loc[1]/25])
-            # print(ego_next_state,npc_next_state)
             # 碰撞、变道检测
             col = self.sensor_list[i].get_collision_history()
-            # npc_col = self.sensor_list[1][0].get_collision_history()
-            # ego_inv = ego_sensor[1].get_invasion_history()
-            # npc_inv = npc_sensor[1].get_invasion_history()
-            
 
             # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
             # ev=-1 if ego_velocity <= 2 else 0
-            # nv=-1 if npc_velocity <= 2 else 0
+
             route_bonus,timeout = 0, 0
             
             if self.args.Frenet:
@@ -583,12 +548,6 @@ class Create_Envs(object):
                 elif np.sqrt(next_disX**2+next_disY**2) < 2:
                     route_bonus = 2
                     step_list[i] += 2  
-
-            # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
-            
-            # self.sensor_list[0][1].reset()
-            # self.sensor_list[1][1].reset()
 
             # done结束状态判断
             if step_list[i] >= self.ego_num[i] - 3:

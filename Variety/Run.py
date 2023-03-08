@@ -99,13 +99,13 @@ class Runner:
     # @profile(stream=open('memory_profile.log','w+'))
     def run(self, ):
         try:
-            if self.args.mode == 'test':
+            if self.args.mode == 'test' or self.args.load == True:
                 for i in range(self.agent_num): 
                     self.policy[i].load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/' + str(i))
                     
             evaluate_num = -1  # Record the number of evaluations
             save_num = 1
-            best_evaluate_reward = list(-99999*np.ones(self.agent_num,dtype=int))
+            best_evaluate_reward = -99999
             flag = 0
             
             for i in range(self.args.max_episode):
@@ -161,12 +161,13 @@ class Runner:
                     evaluate_num += 1
                     # Save the models
                     # if self.total_episode // self.args.save_freq > save_num:
-                    for j in range(self.agent_num):
-                        if total_evaluate_reward[j] > best_evaluate_reward[j]:
+                    
+                    if sum(total_evaluate_reward) > best_evaluate_reward:
+                        best_evaluate_reward = sum(total_evaluate_reward)
+                        for j in range(self.agent_num):
                             self.policy[j].save(self.save_directory + '/' + str(j))
-                            best_evaluate_reward[j] = total_evaluate_reward[j]
                             # save_num += 1
-                            print('Network Saved')
+                        print('Network Saved')
                 
                 episode_steps = self.run_episode()  # Run an episode
                 self.total_steps += episode_steps
@@ -194,6 +195,7 @@ class Runner:
     def run_episode(self, ):
         print('------start_simulating-------')
         total_reward = list(np.zeros(self.agent_num,dtype=int))
+        total_score = list(np.zeros(self.agent_num,dtype=int))
         offsetx = list(np.zeros(self.agent_num,dtype=int))
         offsety = list(np.zeros(self.agent_num,dtype=int))
         dw = list(np.zeros(self.agent_num,dtype=int))
@@ -211,6 +213,7 @@ class Runner:
 
         last_step = list(np.ones(self.agent_num,dtype=int))
         episode_reward = list(np.zeros(self.agent_num,dtype=int))
+        episode_score = list(np.zeros(self.agent_num,dtype=int))
         train_reward = list(np.zeros(self.agent_num,dtype=int))
         final_step = list(np.ones(self.agent_num,dtype=int))
         for j in range(self.agent_num):
@@ -265,12 +268,14 @@ class Runner:
                     # print([episode_step, ego_state, p, ego_v, ego_a, ego_a_logprob, ego_reward, ego_dw])
                     # print('aaaaaaaa: ',len(data),len(p),len(v_list),len(a_list),len(a_logprob),len(dw))
                     total_reward[j] += data[j][1]
+                    total_score[j] += score[j]
                     if self.args.mode == 'train':
                         self.buffer[j].store_transition(episode_step, last_state[j], last_BEV[j], v_list[j], a_list[j], a_logprob[j], data[j][1], data[j][0], data[j][-1], dw[j])
                     last_state[j] = data[j][0]
                     last_BEV[j] = data[j][-1]
                     last_step[j] = episode_step
                     episode_reward[j] = total_reward[j]
+                    episode_score[j] = total_score[j]
                     final_step[j] = step_list[j]
                     offsetx[j] += np.abs(data[j][0][0])
                     offsety[j] += np.abs(data[j][0][1])
@@ -293,6 +298,7 @@ class Runner:
             train_reward[j] = episode_reward[j]/(last_step[j] + 1)
             self.writer.add_scalar('reward/'+str(j)+'_train_rewards', train_reward[j], global_step=self.total_episode)
             self.writer.add_scalar('reward/'+str(j)+'_total_train_rewards', episode_reward[j], global_step=self.total_episode)
+            self.writer.add_scalar('score/'+str(j)+'_total_train_score', episode_score[j], global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_train_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_train_offsetx', offsetx[j]/(last_step[j] + 1), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_train_offsety', offsety[j]/(last_step[j] + 1), global_step=self.total_episode)
@@ -300,6 +306,7 @@ class Runner:
             self.writer.add_scalar('rate/'+str(j)+'_train_finish', data[j][3], global_step=self.total_episode)
         self.writer.add_scalar('reward/train_rewards', sum(train_reward)/self.agent_num, global_step=self.total_episode)
         self.writer.add_scalar('reward/total_train_rewards', sum(episode_reward)/self.agent_num, global_step=self.total_episode)
+        self.writer.add_scalar('score/total_train_scores', sum(episode_score)/self.agent_num, global_step=self.total_episode)
         self.writer.add_scalar('step/train_step', episode_step, global_step=self.total_episode)
         print("Episode: {} step: {} ".format(self.total_episode, episode_step+1))
         self.create_envs.clean()
@@ -316,12 +323,14 @@ class Runner:
         dw = list(np.zeros(self.agent_num,dtype=int))
         a_list = list(np.zeros([self.agent_num,self.args.action_dim],dtype=int))
         last_step = list(np.zeros(self.agent_num,dtype=int))
-        episode_reward = list(np.zeros(self.agent_num,dtype=int))
+        # episode_reward = list(np.zeros(self.agent_num,dtype=int))
         total_evaluate_reward = list(np.zeros(self.agent_num,dtype=int))
+        total_evaluate_score = list(np.zeros(self.agent_num,dtype=int))
         final_step = list(np.zeros(self.agent_num,dtype=int))
 
         for _ in range(self.args.evaluate_times):
             episode_reward = list(np.zeros(self.agent_num,dtype=int))
+            episode_score = list(np.zeros(self.agent_num,dtype=int))
             offsetx = list(np.zeros(self.agent_num,dtype=int))
             offsety = list(np.zeros(self.agent_num,dtype=int))
             step_list = list(np.ones(self.agent_num,dtype=int))
@@ -365,6 +374,7 @@ class Runner:
                     if dw[j] <= 1:
                         last_step[j] = episode_step
                         episode_reward[j] += data[j][1]
+                        episode_score[j] += score[j]
                         final_step[j] = step_list[j]
                         offsetx[j] += np.abs(data[j][0][0])
                         offsety[j] += np.abs(data[j][0][1])
@@ -380,6 +390,7 @@ class Runner:
             for j in range(self.agent_num):
                 evaluate_reward[j] += (episode_reward[j]/(last_step[j] + 1))
                 total_evaluate_reward[j] += (episode_reward[j])
+                total_evaluate_score[j] += (episode_score[j])
                 total_offsetx[j] += (offsetx[j]/(last_step[j] + 1))
                 total_offsety[j] += (offsety[j]/(last_step[j] + 1))
                 total_fin[j] += data[j][3]
@@ -388,6 +399,7 @@ class Runner:
 
         evaluate_reward = [a/self.args.evaluate_times for a in evaluate_reward]
         total_evaluate_reward = [a/self.args.evaluate_times for a in total_evaluate_reward]
+        total_evaluate_score = [a/self.args.evaluate_times for a in total_evaluate_score]
         total_offsetx = [a/self.args.evaluate_times for a in total_offsetx]
         total_offsety = [a/self.args.evaluate_times for a in total_offsety]
         evaluate_step /= self.args.evaluate_times
@@ -397,6 +409,7 @@ class Runner:
         for j in range(self.agent_num):
             self.writer.add_scalar('reward/'+str(j)+'_evaluate_rewards', evaluate_reward[j], global_step=self.total_episode)
             self.writer.add_scalar('reward/'+str(j)+'_total_evaluate_rewards', total_evaluate_reward[j], global_step=self.total_episode)
+            self.writer.add_scalar('score/'+str(j)+'_total_evaluate_scores', total_evaluate_score[j], global_step=self.total_episode)
             self.writer.add_scalar('step/'+str(j)+'_step', final_step[j]/(self.num[j]-3), global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsetx', total_offsetx[j], global_step=self.total_episode)
             self.writer.add_scalar('offset/'+str(j)+'_offsety', total_offsety[j], global_step=self.total_episode)
@@ -405,6 +418,7 @@ class Runner:
         self.writer.add_scalar('episode', self.total_episode, global_step=self.total_episode)
         self.writer.add_scalar('reward/evaluate_rewards', sum(evaluate_reward)/self.agent_num, global_step=self.total_episode)
         self.writer.add_scalar('reward/total_evaluate_rewards', sum(total_evaluate_reward)/self.agent_num, global_step=self.total_episode)
+        self.writer.add_scalar('score/total_evaluate_scores', sum(total_evaluate_score)/self.agent_num, global_step=self.total_episode)
         self.writer.add_scalar('step/step', evaluate_step, global_step=self.total_episode)
 
         self.create_envs.clean()
@@ -430,8 +444,8 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--init_std", type=float, default=0.15, help="std_initialization")
@@ -454,6 +468,7 @@ if __name__ == '__main__':
     parser.add_argument("--use_gru", type=bool, default=True, help="Whether to use GRU") # Priority for GRU
     parser.add_argument("--use_lstm", type=bool, default=False, help="Whether to use LSTM")
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
+    parser.add_argument("--load", type=bool, default=False, help="Whether to load old model")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
     parser.add_argument('--save_seed', default=5, type=str) # seed
     parser.add_argument('--load_seed', default=5, type=str) # seed
@@ -464,12 +479,12 @@ if __name__ == '__main__':
     parser.add_argument('--W', default=56, type=int) # BEV_Width
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
-    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='crossroad', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
     parser.add_argument('--random0', default=False, type=bool) # random-training for ENVS
     parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
     parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
     parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
-    parser.add_argument('--agent_num', default=3, type=int) # 当前智能体个数
+    parser.add_argument('--agent_num', default=4, type=int) # 当前智能体个数
     # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
     parser.add_argument('--pure_track', default=False, type=bool) # 纯跟踪/

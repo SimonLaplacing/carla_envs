@@ -482,14 +482,14 @@ class Create_Envs(object):
 
             score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
+            # reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
 
             #reward shaping
-            # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
-            # + (-10)*(target_disX/5)**2 + (-20)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            # + 50*route_bonus - 50*timeout + 10*path_bonus
-            # - 1*abs(acc[1]))
+            reward = ((-100)*col[0] + (5)*math.log4(dis) 
+            + (-10)*(target_disX/5)**2 + (-20)*(target_disY/15)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            + (-5)*(next_disX/10)**2 + (-10)*(next_disY/15)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            + 40*route_bonus - 100*timeout + 10*path_bonus - 0.0005*step*step
+            - 1*abs(acc[1]))
 
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
         return data,step_list,score
@@ -509,7 +509,7 @@ class Create_Envs(object):
     
     @staticmethod
     def get_max_agent():
-        return 2
+        return 4
 
     def clean(self):
         # 清洗环境

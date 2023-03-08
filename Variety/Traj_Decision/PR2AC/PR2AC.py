@@ -350,7 +350,7 @@ class PPO_RNN:
 
                     # Update
                     self.optimizer.zero_grad()
-                    loss = actor_loss + critic_loss * 0.5 + om_loss * 0.5
+                    loss = actor_loss + critic_loss * 0.5 + om_loss * 0.6
                     # print('all kinds of loss:            ', actor_loss,critic_loss,om_loss)
                     loss.backward()
                     if self.use_grad_clip:  # Trick 7: Gradient clip

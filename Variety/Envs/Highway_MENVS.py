@@ -509,8 +509,6 @@ class Create_Envs(object):
 
             # self.sensor_list[0][1].reset()
 
-            
-
             # done结束状态判断
             if step_list[i] >= self.ego_num[i] - 3:
                 col_num = 0
@@ -521,7 +519,7 @@ class Create_Envs(object):
             else:
                 col_num = 0
                 finish = 0
-                
+
             score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
             reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
