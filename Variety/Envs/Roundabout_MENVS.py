@@ -405,7 +405,7 @@ class Create_Envs(object):
         # 车辆信息反馈
     def get_vehicle_step(self, step_list, step):
         data = list(np.zeros(self.agent_num,dtype=int))
-        
+        score = list(np.zeros(self.agent_num,dtype=int))
         for i in range(self.agent_num):
             path = []
             path_bonus = 0
@@ -504,7 +504,7 @@ class Create_Envs(object):
             # ego_BEV = self.sensor_list[0][1].get_BEV()
             # npc_BEV = self.sensor_list[1][1].get_BEV()
 
-            next_state = [target_disX/5,target_disY/10,next_disX/10,next_disY/10,vec[0]/40,vec[1]/40,next_vec[0]/40,next_vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
+            next_state = [target_disX/5,target_disY/10,next_disX/10,next_disY/10,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
             # ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2) # 外车6
             for j in range(self.args.max_agent_num):
@@ -520,29 +520,8 @@ class Create_Envs(object):
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
-            # npc_target_disX = npc_f_loc[0]
-            # npc_target_disY = npc_f_loc[1]
-            # npc_ego_disX = npc_ego_loc[0]
-            # npc_ego_disY = npc_ego_loc[1]
-            # npc_next_disX = npc_next_loc[0]
-            # npc_next_disY = npc_next_loc[1]
-
-            # npc_dis_x = (ego_next_transform.location.x-npc_next_transform.location.x)
-            # npc_dis_y = (ego_next_transform.location.y-npc_next_transform.location.y)
-            # npc_dis = np.sqrt(npc_dis_x**2+npc_dis_y**2)
-            # npc_ob_x = (obstacle_next_transform.location.x-npc_next_transform.location.x)
-            # npc_ob_y = (obstacle_next_transform.location.y-npc_next_transform.location.y)
-            # npc_ob = np.sqrt(npc_ob_x**2+npc_ob_y**2)
-
-            # npc_next_state = np.array([npc_target_disX/5,npc_target_disY/10,npc_next_disX/10,npc_next_disY/10,npc_vec[0]/40,npc_vec[1]/40,npc_next_vec[0]/40,npc_next_vec[1]/40,np.sin(npc_yaw/2),np.sin(npc_next_yaw/2),
-            # npc_ego_disX/40,npc_ego_disY/10,misc.get_speed(self.ego_list[0])/40,npc_ego_vec[0]/30,npc_ego_vec[1]/30,np.sin(npc_ego_yaw/2),
-            # npc_ob_loc[0]/30,npc_ob_loc[1]/25])
-            # print(ego_next_state,npc_next_state)
             # 碰撞、变道检测
             col = self.sensor_list[i].get_collision_history()
-            # npc_col = self.sensor_list[1][0].get_collision_history()
-            # ego_inv = ego_sensor[1].get_invasion_history()
-            # npc_inv = npc_sensor[1].get_invasion_history()
             
 
             # 回报设置:碰撞惩罚、纵向奖励、最低速度惩罚、存活奖励 
@@ -562,10 +541,7 @@ class Create_Envs(object):
                     route_bonus = 2
                     step_list[i] += 2  
 
-            # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
-            
-            # self.sensor_list[0][1].reset()
+             # self.sensor_list[0][1].reset()
             # self.sensor_list[1][1].reset()
             # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
             ego_score = 0
@@ -582,19 +558,9 @@ class Create_Envs(object):
                 col_num = 0
                 finish = 0
 
-            # if npc_step >= self.npc_num - 3:
-            #     npccol_num = 0
-            #     npc_finish = 1
-            # elif npc_col[0]==1 or npc_path==0: # npc结束条件npc_done
-            #     npccol_num = 1
-            #     npc_finish = 0
-            # else:
-            #     npccol_num = 0
-            #     npc_finish = 0
-
+            score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-0.6)*timeout + 0.5*route_bonus
-            # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
+            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
 
             #reward shaping
             # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
@@ -602,13 +568,9 @@ class Create_Envs(object):
             # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 50*route_bonus - 50*timeout + 10*path_bonus
             # - 1*abs(acc[1]))
-            # npc_reward = ((-80)*npc_col[0] + (0.002)*(npc_dis + npc_ob)
-            # + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2))
-            # + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/10)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) 
-            # + 50*npc_bonus - 50*timeout + 10*npc_path_bonus
-            # - 0.25*abs(npc_acc[1]))
+
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
-        return data,step_list
+        return data,step_list,score
 
     # 车辆动作空间
     def get_action_space(self):

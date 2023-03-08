@@ -103,7 +103,7 @@ class Create_Envs(object):
         # ego1车辆设置---------------------------------------------------------------
         ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
         # 坐标建立
-        self.ego_transform = Transform(Location(x=160.341522+deltaX[0], y=-371.640472+deltaY[0], z=0.281942), 
+        self.ego_transform = Transform(Location(x=165.341522+deltaX[0], y=-371.640472+deltaY[0], z=0.281942), 
                     Rotation(pitch=0.000000, yaw=0.500910+deltaYaw[0], roll=0.000000))
         # 车辆从蓝图定义以及坐标生成:
         ego_bp.set_attribute('color', '229,28,0')
@@ -123,7 +123,7 @@ class Create_Envs(object):
 
         if self.agent_num>=2:
             # ego2序列设置--------------------------------------------------------------------
-            self.ego_transform = Transform(Location(x=145.341522+deltaX[1], y=-375.140472+deltaY[1], z=0.281942), 
+            self.ego_transform = Transform(Location(x=148.341522+deltaX[1], y=-375.140472+deltaY[1], z=0.281942), 
                         Rotation(pitch=0.000000, yaw=0.500910+deltaYaw[1], roll=0.000000))
             ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
             ego_bp.set_attribute('color', '29,128,120')
@@ -146,7 +146,7 @@ class Create_Envs(object):
                 
             if self.agent_num>=3:
                 # ego3序列设置--------------------------------------------------------------------
-                self.ego_transform = Transform(Location(x=128.341522+deltaX[2], y=-375.140472+deltaY[2], z=0.281942), 
+                self.ego_transform = Transform(Location(x=170.341522+deltaX[2], y=-375.140472+deltaY[2], z=0.281942), 
                             Rotation(pitch=0.000000, yaw=0.500910+deltaYaw[2], roll=0.000000))
                 ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
                 ego_bp.set_attribute('color', '129,128,0')
@@ -171,7 +171,7 @@ class Create_Envs(object):
                     # ego4车辆设置---------------------------------------------------------------
                     ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
                     # 坐标建立
-                    self.ego_transform = Transform(Location(x=140.341522+deltaX[3], y=-371.640472+deltaY[3], z=0.281942), 
+                    self.ego_transform = Transform(Location(x=148.341522+deltaX[3], y=-371.640472+deltaY[3], z=0.281942), 
                                 Rotation(pitch=0.000000, yaw=0.500910+deltaYaw[3], roll=0.000000))
                     # 车辆从蓝图定义以及坐标生成
                     ego_bp.set_attribute('color', '29,128,0')
@@ -227,7 +227,7 @@ class Create_Envs(object):
             self.sensor_list[i] = collision
         
         # 车辆初始参数
-        target_speed = [carla.Vector3D(16.5+deltaV[0],0,0),carla.Vector3D(20+deltaV[1],0,0),carla.Vector3D(20+deltaV[2],0,0)] # 16.5-20
+        target_speed = [carla.Vector3D(16.5+deltaV[0],0,0),carla.Vector3D(20+deltaV[1],0,0),carla.Vector3D(20+deltaV[2],0,0),carla.Vector3D(16.5+deltaV[3],0,0)] # 16.5-20
         for i in range(self.agent_num):
             self.ego_list[i].set_target_velocity(target_speed[i])
 
@@ -249,7 +249,7 @@ class Create_Envs(object):
     def get_route(self):
         # 全局路径
         start_location = list(np.zeros(self.agent_num,dtype=int))
-        delta = [carla.Location(x=138,y=-3.5),carla.Location(x=95),carla.Location(x=95)]
+        delta = [carla.Location(x=83),carla.Location(x=82),carla.Location(x=85),carla.Location(x=85)]
         for i in range(self.agent_num):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
@@ -380,6 +380,7 @@ class Create_Envs(object):
         # 车辆信息反馈
     def get_vehicle_step(self, step_list, step):
         data = list(np.zeros(self.agent_num,dtype=int))
+        score = list(np.zeros(self.agent_num,dtype=int))
         
         for i in range(self.agent_num):
             path = []
@@ -464,7 +465,7 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
 
-            next_state = [target_disX/3,target_disY/8,next_disX/3,next_disY/8,vec[0]/40,vec[1]/20,next_vec[0]/40,next_vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
+            next_state = [target_disX/5,target_disY/8,next_disX/5,next_disY/8,vec[0]/40,vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
 
             for j in range(self.args.max_agent_num):
@@ -476,7 +477,7 @@ class Create_Envs(object):
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
                     else:
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/4,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
+                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/8,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)
@@ -506,12 +507,9 @@ class Create_Envs(object):
             if step >= self.args.max_length_of_trajectory - 1:
                 timeout = 1
 
-            # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-             
             # self.sensor_list[0][1].reset()
-            # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
-            ego_score = 0
-            npc_score = 0
+
+            
 
             # done结束状态判断
             if step_list[i] >= self.ego_num[i] - 3:
@@ -523,9 +521,10 @@ class Create_Envs(object):
             else:
                 col_num = 0
                 finish = 0
-
+                
+            score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-0.8)*timeout + 0.5*route_bonus
+            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
 
             #reward shaping
             # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
@@ -533,8 +532,9 @@ class Create_Envs(object):
             # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 50*route_bonus - 50*timeout + 10*path_bonus
             # - 1*abs(acc[1]))
+
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
-        return data,step_list
+        return data,step_list,score
 
     # 车辆动作空间
     def get_action_space(self):

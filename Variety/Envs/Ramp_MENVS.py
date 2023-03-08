@@ -392,7 +392,7 @@ class Create_Envs(object):
         # 车辆信息反馈
     def get_vehicle_step(self, step_list, step):
         data = list(np.zeros(self.agent_num,dtype=int))
-        
+        score = list(np.zeros(self.agent_num,dtype=int))
         for i in range(self.agent_num):
             path = []
             path_bonus = 0
@@ -477,7 +477,7 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
 
-            next_state = [target_disX/3,target_disY/8,next_disX/3,next_disY/8,vec[0]/40,vec[1]/20,next_vec[0]/40,next_vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
+            next_state = [target_disX/3,target_disY/8,next_disX/3,next_disY/8,vec[0]/40,vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
 
             for j in range(self.args.max_agent_num):
@@ -521,14 +521,9 @@ class Create_Envs(object):
             if step >= self.args.max_length_of_trajectory - 1:
                 timeout = 1
 
-            # ego_reward = (-80)*ego_col[0] + (-5)*(ego_target_disX/5)**2 + (-10)*(ego_target_disY/10)**2 + (-30)*np.abs(np.sin(ego_yaw/2)) + (-2.5)*(ego_next_disX/10)**2 + (-5)*(ego_next_disY/20)**2 + (-15)*np.abs(np.sin(ego_next_yaw/2)) + (0.002)*(ego_dis) + 50*ego_bonus - 0.0005*step
-            # npc_reward = (-80)*npc_col[0] + (-5)*(npc_target_disX/5)**2 + (-10)*(npc_target_disY/10)**2 + (-30)*np.abs(np.sin(npc_yaw/2)) + (-2.5)*(npc_next_disX/10)**2 + (-5)*(npc_next_disY/20)**2 + (-15)*np.abs(np.sin(npc_next_yaw/2)) + (0.002)*(npc_dis) + 50*npc_bonus - 0.0005*step
             
             # self.sensor_list[0][1].reset()
             # self.sensor_list[1][1].reset()
-            # print(ego_reward,npc_reward,ego_bonus,npc_bonus)
-            ego_score = 0
-            npc_score = 0
 
             # done结束状态判断
             if step_list[i] >= self.ego_num[i] - 3:
@@ -541,9 +536,9 @@ class Create_Envs(object):
                 col_num = 0
                 finish = 0
 
+            score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-0.8)*timeout + 0.5*route_bonus
-            # npc_reward = (-1)*npc_col[0] + (-0.6)*timeout + 1*npc_bonus
+            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
 
             #reward shaping
             # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
@@ -551,8 +546,9 @@ class Create_Envs(object):
             # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
             # + 50*route_bonus - 50*timeout + 10*path_bonus
             # - 1*abs(acc[1]))
+
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
-        return data,step_list
+        return data,step_list,score
 
     # 车辆动作空间
     def get_action_space(self):
