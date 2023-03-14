@@ -249,7 +249,7 @@ class Create_Envs(object):
     def get_route(self):
         # 全局路径
         start_location = list(np.zeros(self.agent_num,dtype=int))
-        delta = [carla.Location(x=83),carla.Location(x=82),carla.Location(x=85),carla.Location(x=85)]
+        delta = [carla.Location(x=83),carla.Location(x=90),carla.Location(x=85),carla.Location(x=85)]
         for i in range(self.agent_num):
             start_location[i] = self.ego_list[i].get_location()
             self.route[i] = self.route_positions_generate(start_location[i],start_location[i]+delta[i])
@@ -335,7 +335,7 @@ class Create_Envs(object):
 
             elif self.args.control_mode == 1:
                 move,steer = action[i]
-                steer = self.args.fixed_delta_seconds*(180/540)*steer + self.ego_list[i].get_control().steer
+                steer = self.args.fixed_delta_seconds*(180/486)*steer + self.ego_list[i].get_control().steer
                 steer = np.clip(steer, -1, 1)
                 if move >= 0:
                     throttle = self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().throttle
@@ -465,7 +465,7 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
 
-            next_state = [target_disX/5,target_disY/8,next_disX/5,next_disY/8,vec[0]/40,vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车10
+            next_state = [target_disX/5,target_disY/8,next_disX/5,next_disY/8,vec[0]/40,vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
 
             for j in range(self.args.max_agent_num):
@@ -522,14 +522,14 @@ class Create_Envs(object):
 
             score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
+            reward = (-1)*col[0] + (-0.000002)*step*step + 0.5*route_bonus
 
             #reward shaping
-            # reward = ((-100)*col[0] + (0.02)*(dis + ob) 
-            # + (-10)*(target_disX/5)**2 + (-20)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
-            # + (-5)*(next_disX/10)**2 + (-10)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
-            # + 50*route_bonus - 50*timeout + 10*path_bonus
-            # - 1*abs(acc[1]))
+            # reward = ((-50)*col[0] + (0.001)*(dis + ob) 
+            # + (-1)*(target_disX/5)**2 + (-10)*(target_disY/10)**2 + (-30)*np.abs(np.sin(yaw/2)) 
+            # + (-1)*(next_disX/10)**2 + (-5)*(next_disY/10)**2 + (-15)*np.abs(np.sin(next_yaw/2))
+            # + 30*route_bonus - 50*timeout + 10*path_bonus
+            # - 0.5*abs(acc[1]))
 
             data[i] = [next_state,reward,col_num,finish,ego_BEV]
         return data,step_list,score

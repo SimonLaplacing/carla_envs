@@ -35,29 +35,20 @@ class Create_Envs(object):
         self.client = None
         self.blueprint_library = None
         self.route = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_route = []
-        self.ego_num = list(999*np.ones(self.agent_num,dtype=int))
-        # self.npc_num            
+        self.ego_num = list(999*np.ones(self.agent_num,dtype=int))       
         self.c_tau = args.c_tau
         self.ego_transform = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_transform = 0
         self.birdViewProducer = None
         self.directory = directory
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_controller = None
         
         # PATH
         self.pathplanner = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_pathplanner = None
         self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_wps_to_go = 0
         self.path = list(np.zeros(self.agent_num,dtype=int))
         self.fp = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_path = 0
         self.f_idx = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_f_idx = 0
         self.last_idx = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_last_idx = 0
 
         # PID
         self._dt = 1.0 / 20.0
@@ -297,7 +288,6 @@ class Create_Envs(object):
 
     def get_path(self,vehicle,pathplanner,f_idx):
         #局部路径
-        # ego_fp, ego_fplist, ego_best_path_idx = self.generate_path('ego')
         fp, fplist, best_path_idx, wps_to_go = self.generate_path(vehicle,pathplanner,f_idx)
         path = fp
         positions = []
@@ -307,9 +297,6 @@ class Create_Envs(object):
         for i in range((len(path.t))):
             position = [path.x[i],path.y[i]]
             positions.append(position)
-        # for i in range((len(self.npc_path.t))):
-        #     position = [self.npc_path[i].x,self.npc_path[i].y]
-        #     ego_positions.append(position)
         return positions, wps_to_go, fp, fplist, best_path_idx
 
 
@@ -364,12 +351,6 @@ class Create_Envs(object):
                 elif move < 0:
                     brake = -self.args.c_tau*move + (1-self.args.c_tau)*self.ego_list[i].get_control().brake
                     control[i] = carla.VehicleControl(throttle = 0, steer = steer, brake = brake)
-                # if npc_move >= 0:
-                #     npc_throttle = self.args.c_tau*npc_move + (1-self.args.c_tau)*self.npc_list[0].get_control().throttle
-                #     npc_control = carla.VehicleControl(throttle = npc_throttle, steer = npc_steer, brake = 0)
-                # elif npc_move < 0:
-                #     npc_brake = -self.args.c_tau*npc_move + (1-self.args.c_tau)*self.npc_list[0].get_control().brake
-                #     npc_control = carla.VehicleControl(throttle = 0, steer = npc_steer, brake = npc_brake)
             elif self.args.control_mode == 2:
                 # print(i,len(self.fp),self.f_idx[i],len(self.fp[i].x),len(self.fp[i].y),len(self.fp[i].v))
                 if self.args.Start_Path:
@@ -404,7 +385,6 @@ class Create_Envs(object):
 
         for i in range(self.agent_num):
             self.ego_list[i].apply_control(control[i])
-        # self.npc_list[0].apply_control(npc_control)
 
         # print('ego:%f,%f,%f,npc:%f,%f,%f'%(self.ego_list[0].get_control().throttle,self.ego_list[0].get_control().steer,self.ego_list[0].get_control().brake,
         #                                 self.npc_list[0].get_control().throttle,self.npc_list[0].get_control().steer,self.npc_list[0].get_control().brake))
@@ -444,7 +424,6 @@ class Create_Envs(object):
 
         
             location = [self.ego_list[i].get_location().x, self.ego_list[i].get_location().y, math.radians(self.ego_list[i].get_transform().rotation.yaw)]
-            # npc_location = [npc.get_location().x, npc.get_location().y, math.radians(npc.get_transform().rotation.yaw)]
 
             if self.args.Start_Path:
                 if path!=0:
@@ -460,13 +439,10 @@ class Create_Envs(object):
                 next_route = self.route[i][self.ego_num[i]-1]
 
             next_transform = self.ego_list[i].get_transform()
-            # npc_next_transform = self.npc_list[0].get_transform()
             obstacle_next_transform = self.obstacle_list[0].get_transform()
             # 速度、加速度
             velocity = self.ego_list[i].get_velocity()
-            # npc_velocity = self.npc_list[0].get_velocity()
             yaw = next_transform.rotation.yaw * np.pi/180
-            # npc_yaw = npc_next_transform.rotation.yaw * np.pi/180
             acc = self.ego_list[i].get_acceleration()
             if self.args.Frenet:
                 f_loc,vec,yaw,acc = misc.inertial_to_frenet(route,next_transform.location.x,next_transform.location.y,velocity.x,velocity.y,yaw,acc.x,acc.y)
@@ -486,8 +462,6 @@ class Create_Envs(object):
 
             target_disX = f_loc[0]
             target_disY = f_loc[1]
-            # ego_npc_disX = ego_npc_loc[0]
-            # ego_npc_disY = ego_npc_loc[1]
             next_disX = next_loc[0]
             next_disY = next_loc[1]
 
@@ -507,10 +481,6 @@ class Create_Envs(object):
             # cv.imwrite(self.directory + '/save_1.png', ego_rgb)
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
-            # npc_BEV = npc_rgb.swapaxes(0,2).swapaxes(1,2)
-
-            # ego_BEV = self.sensor_list[0][1].get_BEV()
-            # npc_BEV = self.sensor_list[1][1].get_BEV()
 
             next_state = [target_disX/5,target_disY/15,next_disX/10,next_disY/15,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
             ob_loc[0]/30,ob_loc[1]/25] # 障碍2
@@ -560,9 +530,9 @@ class Create_Envs(object):
                 col_num = 0
                 finish = 0
 
-            score[i] = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
+            score[i] = (-1)*col[0] + (-1)*timeout + 0.2*route_bonus
             #simple reward
-            reward = (-1)*col[0] + (-1)*timeout + 0.1*route_bonus
+            reward = (-1)*col[0] + (-1)*timeout + 0.2*route_bonus
 
             #reward shaping
             # reward = ((-100)*col[0] + (0.02)*(dis + ob) 

@@ -39,27 +39,17 @@ class Actor_Critic_RNN(nn.Module):
         self.activate_func1 = [nn.CELU(), nn.Softsign()][args.use_tanh]  # Trick10: use tanh
         self.activate_func2 = nn.Softsign()
         # BEV
-        # self.BEV_layer = resnet18(pretrained=True)
-        # self.BEV_layer.fc = torch.nn.Linear(512,args.hidden_dim1)
-        # self.Norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        # self.BEV_layer = efficientnet_b0(pretrained=True)
         self.BEV_fc = nn.Linear(1000, args.hidden_dim1)
 
         # actor_init
         self.share_rnn_hidden = None
         self.actor_fc11 = nn.Linear(args.state_dim, args.hidden_dim1)
-        # self.actor_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
-        # if args.use_gru:
-        #     self.actor_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
-        # elif args.use_lstm:
-        #     self.actor_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
-        # self.actor_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
         self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
 
         # critic_init
         # self.critic_rnn_hidden = None
-        self.share_fc11 = nn.Linear(args.state_dim+(args.agent_num-1)*args.action_dim, args.hidden_dim1)
+        self.share_fc11 = nn.Linear(args.state_dim+(args.max_agent_num-1)*args.action_dim, args.hidden_dim1)
         self.share_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
         if args.use_gru:
             self.share_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
@@ -69,38 +59,26 @@ class Actor_Critic_RNN(nn.Module):
         self.critic_fc3 = nn.Linear(args.hidden_dim2, 1)
 
         # OM_init
-        # self.OM_rnn_hidden = None
-        # self.OM_fc11 = nn.Linear(args.state_dim+(args.agent_num-1)*args.action_dim, args.hidden_dim1)
-        # self.OM_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
-        # if args.use_gru:
-        #     self.OM_rnn = nn.GRU(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
-        # elif args.use_lstm:
-        #     self.OM_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
-        # self.OM_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
-        self.OMmean_layer = nn.Linear(args.hidden_dim2, (args.agent_num-1)*args.action_dim)
-        # self.OMstd_layer = nn.Linear(args.hidden_dim2, args.action_dim)
+        self.OM_fc11 = nn.Linear(args.state_dim+args.action_dim, args.hidden_dim1)
+        self.OMmean_layer = nn.Linear(args.hidden_dim2, (args.max_agent_num-1)*args.action_dim)
+        self.OMstd_layer = nn.Linear(args.hidden_dim2, (args.max_agent_num-1)*(args.max_agent_num-1)*args.action_dim*args.action_dim)
 
         if args.use_orthogonal_init:
             # print("------use orthogonal init------")
             orthogonal_init(self.BEV_fc)
             orthogonal_init(self.actor_fc11)
-            # orthogonal_init(self.actor_fc12)
-            # orthogonal_init(self.actor_fc2)
             orthogonal_init(self.mean_layer,gain=0.1)
             orthogonal_init(self.std_layer)
             orthogonal_init(self.share_fc11)
             orthogonal_init(self.share_fc12)
             orthogonal_init(self.share_fc2)
             orthogonal_init(self.critic_fc3)
-            # orthogonal_init(self.OM_fc11)
-            # orthogonal_init(self.OM_fc12)
-            # orthogonal_init(self.OM_fc2)
+            orthogonal_init(self.OM_fc11)
             orthogonal_init(self.OMmean_layer,gain=0.1)
+            orthogonal_init(self.OMstd_layer)
 
             if self.args.use_gru or self.args.use_lstm:
                 orthogonal_init(self.share_rnn)
-                # orthogonal_init(self.critic_rnn)
-                # orthogonal_init(self.OM_rnn)
 
     def actor(self, s, p):
         # s_ = torch.cat([s,om_a],-1)
@@ -112,7 +90,7 @@ class Actor_Critic_RNN(nn.Module):
         t_ = torch.cat([s_,p_],-1)
 
         if self.args.use_gru or self.args.use_lstm:
-            t_, self.actor_rnn_hidden = self.share_rnn(t_, self.actor_rnn_hidden)
+            t_, self.share_rnn_hidden = self.share_rnn(t_, self.share_rnn_hidden)
         # output = self.activate_func(t_)
         output = self.activate_func1(self.share_fc2(t_))
         mean = self.activate_func2(self.mean_layer(output))
@@ -134,7 +112,7 @@ class Actor_Critic_RNN(nn.Module):
         t_ = torch.cat([s_,p_],-1)
         
         if self.args.use_gru or self.args.use_lstm:
-            t_, self.critic_rnn_hidden = self.share_rnn(t_, self.critic_rnn_hidden)
+            t_, self.share_rnn_hidden = self.share_rnn(t_, self.share_rnn_hidden)
         # output = self.activate_func(t_)
         output = self.activate_func1(self.share_fc2(t_))
         value = self.critic_fc3(output)
@@ -145,25 +123,23 @@ class Actor_Critic_RNN(nn.Module):
         p = self.BEV(p)
         p = p.view(s.shape[0],s.shape[1],self.args.hidden_dim1)
         s_ = torch.cat([s,a],-1)
-        s_ = self.activate_func1(self.share_fc11(s_))
+        s_ = self.activate_func1(self.OM_fc11(s_))
         p_ = self.activate_func1(self.share_fc12(p))
         t_ = torch.cat([s_,p_],-1)
 
         if self.args.use_gru or self.args.use_lstm:
-            t_, self.OM_rnn_hidden = self.share_rnn(t_, self.OM_rnn_hidden)
+            t_, self.share_rnn_hidden = self.share_rnn(t_, self.share_rnn_hidden)
         # output = self.activate_func(t_)
         output = self.activate_func1(self.share_fc2(t_))
         mean = torch.tanh(self.OMmean_layer(output))
-        std = torch.exp(self.activate_func2(self.std_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
-        std = std.view(std.size()[0],std.size()[1],self.args.action_dim,self.args.action_dim)
+        std = torch.exp(self.activate_func2(self.OMstd_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
+        std = std.view(std.size()[0],std.size()[1],(self.args.max_agent_num-1)*self.args.action_dim,(self.args.max_agent_num-1)*self.args.action_dim)
         std = self.args.init_std * torch.tril(std)
         dist = MultivariateNormal(mean, scale_tril=std)  # Get the Gaussian distribution
         return mean, std, dist
 
     def BEV(self, p):
-        # p = self.Norm(p/255)
-        # p = self.BEV_layer(p)
-        # p.detach_()
+
         p = self.activate_func1(self.BEV_fc(p))
         return p
 

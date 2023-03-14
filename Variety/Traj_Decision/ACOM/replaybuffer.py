@@ -96,5 +96,4 @@ class ReplayBuffer:
                 batch['om_real_a'] = torch.cat([batch['om_real_a'],torch.tensor(OM_buffer[j].buffer['a'][:, :max_episode_len], dtype=torch.float32)],-1)
             elif j >= self.args.agent_num-1:
                 batch['om_real_a'] = torch.cat([batch['om_real_a'],padding_a[:, :max_episode_len]],-1)
- 
         return batch

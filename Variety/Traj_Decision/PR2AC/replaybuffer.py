@@ -20,7 +20,7 @@ class ReplayBuffer:
 
     def reset_buffer(self):
         self.buffer = {'s': np.zeros([self.batch_size, self.episode_limit + 1, self.state_dim]),
-                       'p': np.zeros([self.batch_size, self.episode_limit + 1, self.args.hidden_dim1]),
+                       'p': np.zeros([self.batch_size, self.episode_limit + 1, 1000]),
                        'v': np.zeros([self.batch_size, self.episode_limit + 1]),
                        'a': np.zeros([self.batch_size, self.episode_limit,self.action_dim]),
                        'a_logprob': np.zeros([self.batch_size, self.episode_limit]),
@@ -31,7 +31,7 @@ class ReplayBuffer:
         self.episode_num = 0
         self.max_episode_len = 0
 
-    def store_transition(self, episode_step, s, p, v, a, a_logprob, r, dw):
+    def store_transition(self, episode_step, s, p, v, a, a_logprob, r, s_, p_, dw):
         self.buffer['s'][self.episode_num][episode_step] = s
         self.buffer['p'][self.episode_num][episode_step] = p
         self.buffer['v'][self.episode_num][episode_step] = v
@@ -64,7 +64,7 @@ class ReplayBuffer:
             # deltas.shape=(batch_size,max_episode_len)
             deltas = r + self.gamma * v_next * (1 - dw) - v
             for t in reversed(range(max_episode_len)):
-                gae = deltas[:, t] + self.gamma * self.lamda * gae  # gae.shape=(batch_size)
+                gae = deltas[:, t] + self.gamma * self.lamda * gae * (1 - dw[:, t]) # gae.shape=(batch_size)
                 adv[:, t] = gae
             v_target = adv + v  # v_target.shape(batch_size,max_episode_len)
             if self.use_adv_norm:  # Trick 1:advantage normalization

@@ -444,12 +444,12 @@ if __name__ == '__main__':
     parser.add_argument("--carla_lane_width", type=float, default=3.5, help="lane_width")
     parser.add_argument("--carla_max_s", type=int, default=8, help="max_s")
 
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--mini_batch_size", type=int, default=32, help="Minibatch size")
-    parser.add_argument("--hidden_dim1", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--hidden_dim2", type=int, default=64, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.15, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate of actor")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
+    parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
+    parser.add_argument("--hidden_dim1", type=int, default=256, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--hidden_dim2", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
+    parser.add_argument("--init_std", type=float, default=0.2, help="std_initialization")
+    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
@@ -470,8 +470,8 @@ if __name__ == '__main__':
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument("--load", type=bool, default=False, help="Whether to load old model")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=5, type=str) # seed
-    parser.add_argument('--load_seed', default=5, type=str) # seed
+    parser.add_argument('--save_seed', default=1, type=str) # seed
+    parser.add_argument('--load_seed', default=1, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
     parser.add_argument('--max_length_of_trajectory', default=220, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
@@ -479,12 +479,12 @@ if __name__ == '__main__':
     parser.add_argument('--W', default=56, type=int) # BEV_Width
     parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
 
-    parser.add_argument('--envs', default='crossroad', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
     parser.add_argument('--random0', default=False, type=bool) # random-training for ENVS
     parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
     parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
-    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
-    parser.add_argument('--agent_num', default=4, type=int) # 当前智能体个数
+    parser.add_argument('--model', default='PR2AC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
     # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
     parser.add_argument('--pure_track', default=False, type=bool) # 纯跟踪/
