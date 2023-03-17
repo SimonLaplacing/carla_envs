@@ -46,7 +46,6 @@ class Actor_Critic_RNN(nn.Module):
         self.BEV_fc = nn.Linear(1000, args.hidden_dim1)
         # self.qq = 0
 
-        # actor_init
         self.share_rnn_hidden = None
         self.share_fc11 = nn.Linear(args.state_dim+(args.max_agent_num-1)*args.action_dim, args.hidden_dim1)
         self.share_fc12 = nn.Linear(args.hidden_dim1, args.hidden_dim1)
@@ -55,6 +54,7 @@ class Actor_Critic_RNN(nn.Module):
         elif args.use_lstm:
             self.share_rnn = nn.LSTM(2*args.hidden_dim1, 2*args.hidden_dim1, batch_first=True)
         self.share_fc2 = nn.Linear(2*args.hidden_dim1, args.hidden_dim2)
+        # actor_init
         self.mean_layer = nn.Linear(args.hidden_dim2, args.action_dim)
         # self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim*args.action_dim)
         self.std_layer = nn.Linear(args.hidden_dim2, args.action_dim)
