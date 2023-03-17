@@ -44,7 +44,7 @@ class Create_Envs(object):
         self.birdViewProducer = None
         self.directory = directory
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        # self.npc_controller = None
+        self.s_norm = [5,8,5,8,40,20,30,25,40,8,40,40]
         
         # PATH
         self.pathplanner = list(np.zeros(self.agent_num,dtype=int))
@@ -116,23 +116,22 @@ class Create_Envs(object):
         self.ego_transform = Transform(Location(x=102+deltaX[0], y=0+deltaY[0], z=11), 
                     Rotation(pitch=0.000000, yaw=150.500910+deltaYaw[0], roll=0.000000))
         # 车辆从蓝图定义以及坐标生成
-        for i in range(1):
-            ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
-            # print(npc_bp.get_attribute('color').recommended_values)
-            ego_bp.set_attribute('color', '229,28,0')
-            ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
-            self.ego_list[i] = ego
-            if self.args.controller == 1:
-                self.controller[i] = VehiclePIDController(self.ego_list[i],
-                                                        args_lateral=self.lateral_dict,
-                                                        args_longitudinal=self.longitudinal_dict
-                                                        )  
-            elif self.args.controller == 2:
-                self.controller[i] = VehiclePIDController2(self.ego_list[i],
+        ego_bp = self.blueprint_library.find(id='vehicle.lincoln.mkz2017')
+        # print(npc_bp.get_attribute('color').recommended_values)
+        ego_bp.set_attribute('color', '229,28,0')
+        ego = self.world.try_spawn_actor(ego_bp, self.ego_transform)
+        self.ego_list[0] = ego
+        if self.args.controller == 1:
+            self.controller[0] = VehiclePIDController(self.ego_list[0],
                                                     args_lateral=self.lateral_dict,
-                                                    args_longitudinal=self.longitudinal_dict,
-                                                    args=self.args)
-            print('created %s' % ego.type_id)
+                                                    args_longitudinal=self.longitudinal_dict
+                                                    )  
+        elif self.args.controller == 2:
+            self.controller[0] = VehiclePIDController2(self.ego_list[0],
+                                                args_lateral=self.lateral_dict,
+                                                args_longitudinal=self.longitudinal_dict,
+                                                args=self.args)
+        print('created %s' % ego.type_id)
         if self.agent_num>=2:
             # ego2序列设置--------------------------------------------------------------------
             self.ego_transform = Transform(Location(x=110+deltaX[1], y=6.5+deltaY[1], z=11), 
@@ -477,8 +476,8 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
 
-            next_state = [target_disX/3,target_disY/8,next_disX/3,next_disY/8,vec[0]/40,vec[1]/20,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
-            ob_loc[0]/30,ob_loc[1]/25] # 障碍2
+            next_state = [target_disX/self.s_norm[0],target_disY/self.s_norm[1],next_disX/self.s_norm[2],next_disY/self.s_norm[3],vec[0]/self.s_norm[4],vec[1]/self.s_norm[5],np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
+            ob_loc[0]/self.s_norm[6],ob_loc[1]/self.s_norm[7]] # 障碍2
 
             for j in range(self.args.max_agent_num):
                 if j<self.agent_num and j != i:
@@ -489,7 +488,7 @@ class Create_Envs(object):
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
                     else:
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/4,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
+                    next_state.extend([ego_npc_loc[0]/self.s_norm[8],ego_npc_loc[1]/self.s_norm[9],ego_npc_vec[0]/self.s_norm[10],ego_npc_vec[1]/self.s_norm[11],np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)

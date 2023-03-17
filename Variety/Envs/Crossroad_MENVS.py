@@ -41,7 +41,7 @@ class Create_Envs(object):
         self.birdViewProducer = None
         self.directory = directory
         self.controller = list(np.zeros(self.agent_num,dtype=int))
-        
+        self.s_norm = [5,8,5,8,40,20,30,25,40,8,40,40]
         # PATH
         self.pathplanner = list(np.zeros(self.agent_num,dtype=int))
         self.wps_to_go = list(np.zeros(self.agent_num,dtype=int))
@@ -482,9 +482,9 @@ class Create_Envs(object):
 
             ego_BEV = ego_rgb.swapaxes(0,2).swapaxes(1,2)
 
-            next_state = [target_disX/5,target_disY/15,next_disX/10,next_disY/15,vec[0]/40,vec[1]/40,np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
-            ob_loc[0]/30,ob_loc[1]/25] # 障碍2
-            # ego_npc_loc[0]/40,ego_npc_loc[1]/10,misc.get_speed(self.npc_list[0])/40,ego_npc_vec[0]/30,ego_npc_vec[1]/30,np.sin(ego_npc_yaw/2) # 外车6
+            next_state = [target_disX/self.s_norm[0],target_disY/self.s_norm[1],next_disX/self.s_norm[2],next_disY/self.s_norm[3],vec[0]/self.s_norm[4],vec[1]/self.s_norm[5],np.sin(yaw/2),np.sin(next_yaw/2), # 自车8
+            ob_loc[0]/self.s_norm[6],ob_loc[1]/self.s_norm[7]] # 障碍2
+
             for j in range(self.args.max_agent_num):
                 if j<self.agent_num and j != i:
                     opponent_transform = self.ego_list[j].get_transform()
@@ -494,7 +494,7 @@ class Create_Envs(object):
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_frenet(route,opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
                     else:
                         ego_npc_loc,ego_npc_vec,ego_npc_yaw = misc.inertial_to_SDV(self.ego_list[i],opponent_transform.location.x,opponent_transform.location.y,opponent_velocity.x,opponent_velocity.y,opponent_yaw)
-                    next_state.extend([ego_npc_loc[0]/40,ego_npc_loc[1]/15,ego_npc_vec[0]/40,ego_npc_vec[1]/40,np.sin(ego_npc_yaw/2)])
+                    next_state.extend([ego_npc_loc[0]/self.s_norm[8],ego_npc_loc[1]/self.s_norm[9],ego_npc_vec[0]/self.s_norm[10],ego_npc_vec[1]/self.s_norm[11],np.sin(ego_npc_yaw/2)])
                 if j>=self.agent_num:
                     next_state.extend([1,1,0,0,0])
             next_state = np.array(next_state)

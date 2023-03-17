@@ -124,6 +124,7 @@ class Actor_Critic_RNN(nn.Module):
         std = torch.exp(self.activate_func2(self.std_layer(output)))  # The reason we train the 'log_std' is to ensure std=exp(log_std)>0
         std = std.view(std.size()[0],std.size()[1],self.args.action_dim)
         std = self.args.init_std * torch.diag_embed(std)
+        print('std: ', std)
         # std = std.view(std.size()[0],std.size()[1],self.args.action_dim,self.args.action_dim)
         # std = self.args.init_std * torch.tril(std)
         if torch.isnan(mean).any():             
@@ -220,13 +221,11 @@ class PPO_RNN:
 
     def reset_rnn_hidden(self):
         if self.args.use_gru or self.args.use_lstm: 
-            # self.ac.actor_rnn_hidden = None
-            # self.ac.critic_rnn_hidden = None
             self.ac.share_rnn_hidden = None
 
     # @profile(stream=open('memory_profile.log','w+'))
     def choose_action(self, s, p, evaluate=False):
-        self.ac.eval()
+        # self.ac.eval()
         # mask = torch.zeros([self.args.max_agent_num, self.args.action_dim]).to(device)
         # mask[0:self.args.agent_num] = 1
         with torch.no_grad():
@@ -253,7 +252,7 @@ class PPO_RNN:
         return a.cpu().numpy().flatten(), a_logprob.cpu().numpy().flatten()
 
     def get_value(self, s, p, _):
-        self.ac.eval()
+        # self.ac.eval()
         with torch.no_grad():
             # p = np.ascontiguousarray(p)
             # p = torch.as_tensor(p, dtype=torch.float).unsqueeze(0)
@@ -283,6 +282,7 @@ class PPO_RNN:
             for j in range(self.args.agent_num):
                 OM_buffer = replay_buffer.copy()
                 OM_buffer.pop(j)
+                print('1111:  ', len(replay_buffer),len(OM_buffer))
                 if j == 0:
                     batch = replay_buffer[j].get_training_data(max_episode_len,OM_buffer)
                 else:

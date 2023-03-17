@@ -40,7 +40,7 @@ class ReplayBuffer:
         self.buffer['r'][self.episode_num][episode_step] = r
         self.buffer['dw'][self.episode_num][episode_step] = dw
 
-        self.buffer['active'][self.episode_num][episode_step] = 1.0
+        self.buffer['active'][self.episode_num][episode_step] = 1
 
     def store_last_sv(self, episode_step, v, s, p):
         self.buffer['v'][self.episode_num][episode_step] = v
@@ -91,9 +91,9 @@ class ReplayBuffer:
                  'adv': torch.tensor(adv, dtype=torch.float32),
                  'v_target': torch.tensor(v_target, dtype=torch.float32)}
         for j in range(1,self.args.max_agent_num-1):
-            padding_a = torch.zeros([self.batch_size, self.episode_limit,self.action_dim],dtype=torch.int)
-            if j < self.args.agent_num-1:
-                batch['om_real_a'] = torch.cat([batch['om_real_a'],torch.tensor(OM_buffer[j].buffer['a'][:, :max_episode_len], dtype=torch.float32)],-1)
-            elif j >= self.args.agent_num-1:
-                batch['om_real_a'] = torch.cat([batch['om_real_a'],padding_a[:, :max_episode_len]],-1)
+            # padding_a = torch.zeros([self.batch_size, self.episode_limit,self.action_dim],dtype=torch.int)
+            # if j < self.args.agent_num-1:
+            batch['om_real_a'] = torch.cat([batch['om_real_a'],torch.tensor(OM_buffer[j].buffer['a'][:, :max_episode_len], dtype=torch.float32)],-1)
+            # elif j >= self.args.agent_num-1:
+                # batch['om_real_a'] = torch.cat([batch['om_real_a'],padding_a[:, :max_episode_len]],-1)
         return batch

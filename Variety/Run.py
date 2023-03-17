@@ -1,6 +1,6 @@
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
-
+import copy
 import argparse
 import random
 import utils.misc as misc
@@ -104,7 +104,7 @@ class Runner:
                     self.policy[i].load(self.directory + '/' + 'train' + '_' + self.args.envs + '_' + self.args.model + '_' + 'gru'*self.args.use_gru + 'lstm'*self.args.use_lstm + 'nornn'*(1-self.args.use_gru-self.args.use_lstm) + '_' + str(self.args.load_seed) + '/' + str(i))
                     
             evaluate_num = -1  # Record the number of evaluations
-            save_num = 1
+            # save_num = 1
             best_evaluate_reward = -99999
             flag = 0
             
@@ -206,26 +206,26 @@ class Runner:
             self.world.wait_for_tick() # 服务器主导，tick
         data,step_list,score = self.create_envs.get_vehicle_step(step_list, 0)
         last_state = list(np.zeros(self.agent_num,dtype=int))
-        last_BEV = list(np.ones(self.agent_num,dtype=int))
+        last_BEV = list(np.zeros(self.agent_num,dtype=int))
         a_list = list(np.zeros([self.args.max_agent_num,self.args.action_dim],dtype=int))
         v_list = list(np.zeros(self.agent_num,dtype=int))
-        a_logprob = list(np.ones(self.agent_num,dtype=int))
+        a_logprob = list(np.zeros(self.agent_num,dtype=int))
 
-        last_step = list(np.ones(self.agent_num,dtype=int))
+        last_step = list(np.zeros(self.agent_num,dtype=int))
         episode_reward = list(np.zeros(self.agent_num,dtype=int))
         episode_score = list(np.zeros(self.agent_num,dtype=int))
         train_reward = list(np.zeros(self.agent_num,dtype=int))
         final_step = list(np.ones(self.agent_num,dtype=int))
         for j in range(self.agent_num):
             data[j][-1] = self.BEV_handle.act(data[j][-1])
-            last_state[j] = data[j][0]
-            last_BEV[j] = data[j][-1]
+            last_state[j] = copy.deepcopy(data[j][0])
+            last_BEV[j] = copy.deepcopy(data[j][-1])
             if self.args.use_gru or self.args.use_lstm:
-                self.policy[j].reset_rnn_hidden()
+                if not self.args.model=='SAC':
+                    self.policy[j].reset_rnn_hidden()
         if self.args.use_reward_scaling:
             self.reward_scaling.reset()
         
-        # self.policy.reset_rnn_hidden()
         for episode_step in range(999999):
             for j in range(self.agent_num):
                 if self.args.use_state_norm:
@@ -267,12 +267,12 @@ class Runner:
                 if dw[j] <= 1:
                     # print([episode_step, ego_state, p, ego_v, ego_a, ego_a_logprob, ego_reward, ego_dw])
                     # print('aaaaaaaa: ',len(data),len(p),len(v_list),len(a_list),len(a_logprob),len(dw))
-                    total_reward[j] += data[j][1]
+                    total_reward[j] += copy.deepcopy(data[j][1])
                     total_score[j] += score[j]
                     if self.args.mode == 'train':
                         self.buffer[j].store_transition(episode_step, last_state[j], last_BEV[j], v_list[j], a_list[j], a_logprob[j], data[j][1], data[j][0], data[j][-1], dw[j])
-                    last_state[j] = data[j][0]
-                    last_BEV[j] = data[j][-1]
+                    last_state[j] = copy.deepcopy(data[j][0])
+                    last_BEV[j] = copy.deepcopy(data[j][-1])
                     last_step[j] = episode_step
                     episode_reward[j] = total_reward[j]
                     episode_score[j] = total_score[j]
@@ -345,7 +345,8 @@ class Runner:
             
             for j in range(self.agent_num):
                 if self.args.use_gru or self.args.use_lstm:
-                    self.policy[j].reset_rnn_hidden()
+                    if not self.args.model=='SAC':
+                        self.policy[j].reset_rnn_hidden()
 
             for episode_step in range(99999):
                 for j in range(self.agent_num):
@@ -448,20 +449,20 @@ if __name__ == '__main__':
     parser.add_argument("--mini_batch_size", type=int, default=128, help="Minibatch size")
     parser.add_argument("--hidden_dim1", type=int, default=256, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--hidden_dim2", type=int, default=128, help="The number of neurons in hidden layers of the neural network")
-    parser.add_argument("--init_std", type=float, default=0.2, help="std_initialization")
-    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate of actor")
+    parser.add_argument("--init_std", type=float, default=0.02, help="std_initialization")
+    parser.add_argument("--lr", type=float, default=8e-5, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--lamda", type=float, default=0.97, help="GAE parameter")
+    parser.add_argument("--lamda", type=float, default=0.95, help="GAE parameter")
     parser.add_argument("--epsilon", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--K_epochs", type=int, default=10, help="PPO parameter")
+    parser.add_argument("--K_epochs", type=int, default=15, help="PPO parameter")
     parser.add_argument("--M", type=int, default=10, help="sample_times")
-    parser.add_argument("--N", type=int, default=20, help="sample_times")
+    parser.add_argument("--N", type=int, default=10, help="sample_times")
     parser.add_argument("--use_adv_norm", type=bool, default=True, help="Trick 1:advantage normalization")
     parser.add_argument("--use_state_norm", type=bool, default=False, help="Trick 2:state normalization")
     parser.add_argument("--use_reward_scaling", type=bool, default=False, help="Trick 4:reward scaling")
     parser.add_argument("--entropy_coef", type=float, default=0.01, help="Trick 5: policy entropy")
     parser.add_argument("--use_lr_decay", type=bool, default=True, help="Trick 6:learning rate Decay")
-    parser.add_argument("--use_grad_clip", type=bool, default=False, help="Trick 7: Gradient clip")
+    parser.add_argument("--use_grad_clip", type=bool, default=True, help="Trick 7: Gradient clip")
     parser.add_argument("--use_orthogonal_init", type=bool, default=True, help="Trick 8: orthogonal initialization")
     parser.add_argument("--set_adam_eps", type=float, default=True, help="Trick 9: set Adam epsilon=1e-5")
     parser.add_argument("--use_tanh", type=float, default=False, help="Trick 10: tanh activation function")
@@ -470,21 +471,21 @@ if __name__ == '__main__':
     parser.add_argument("--shared_policy", type=bool, default=True, help="Whether to share policy")
     parser.add_argument("--load", type=bool, default=False, help="Whether to load old model")
     parser.add_argument('--mode', default='train', type=str) # mode = 'train' or 'test'
-    parser.add_argument('--save_seed', default=1, type=str) # seed
-    parser.add_argument('--load_seed', default=1, type=str) # seed
+    parser.add_argument('--save_seed', default=5, type=str) # seed
+    parser.add_argument('--load_seed', default=5, type=str) # seed
     parser.add_argument('--c_tau',  default=1, type=float) # action软更新系数,1代表完全更新，0代表不更新
-    parser.add_argument('--max_length_of_trajectory', default=220, type=int) # 最大仿真步数
+    parser.add_argument('--max_length_of_trajectory', default=200, type=int) # 最大仿真步数
     parser.add_argument('--res', default=5, type=int) # pixel per meter
     parser.add_argument('--H', default=224, type=int) # BEV_Height
     parser.add_argument('--W', default=56, type=int) # BEV_Width
-    parser.add_argument('--Frenet', default=0, type=int) # Coordinate:SDV0/frenet1
+    parser.add_argument('--Frenet', default=1, type=int) # Coordinate:SDV0/frenet1
 
-    parser.add_argument('--envs', default='highway', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
+    parser.add_argument('--envs', default='straight', type=str) # 环境选择crossroad,highway,straight,ramp,roundabout,tjunction,circle
     parser.add_argument('--random0', default=False, type=bool) # random-training for ENVS
     parser.add_argument('--random1', default=False, type=bool) # random-training for agent_num
     parser.add_argument('--random2', default=False, type=bool) # random-training for V,X,Y,YAW
-    parser.add_argument('--model', default='PR2AC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
-    parser.add_argument('--agent_num', default=2, type=int) # 当前智能体个数
+    parser.add_argument('--model', default='OMAC', type=str) # 模型选择OMAC、IPPO、MAPPO、MADDPG、PR2AC、Rules
+    parser.add_argument('--agent_num', default=1, type=int) # 当前智能体个数
     # parser.add_argument('--max_agent_num', default=2, type=int) # 最大智能体个数
     parser.add_argument('--controller', default=2, type=int) # /单点跟踪控制：1/双点跟踪控制：2
     parser.add_argument('--pure_track', default=False, type=bool) # 纯跟踪/
